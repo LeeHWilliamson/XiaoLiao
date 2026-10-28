@@ -1,4 +1,17 @@
 enum MockConversation {
+    // The first row and B–J labels are the history fixtures shown in Figma.
+    static var history: [ConversationSession] {
+        (["乌龟"] + Array("BCDEFGHIJ").map(String.init)).enumerated().map { index, title in
+            ConversationSession(
+                id: index == 0 ? "history-turtles" : "history-\(title)",
+                title: title,
+                prompt: prompt,
+                messages: messages,
+                settings: ConversationSettings()
+            )
+        }
+    }
+
     static let prompt = "我想和一位热情的生物学家聊聊革龟的生命周期。用简单的词语，问一些引导性的问题。"
 
     static let messages: [ConversationMessage] = [

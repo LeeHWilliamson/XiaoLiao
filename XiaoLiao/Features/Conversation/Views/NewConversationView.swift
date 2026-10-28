@@ -3,6 +3,8 @@ import SwiftUI
 struct NewConversationView: View {
     @Bindable var viewModel: ConversationViewModel
     let onStart: () -> Void
+    let onHistory: () -> Void
+    let onSettings: () -> Void
     @FocusState private var isPromptFocused: Bool
     @ScaledMetric(relativeTo: .largeTitle) private var titleSize: CGFloat = 48
     @ScaledMetric(relativeTo: .largeTitle) private var subtitleSize: CGFloat = 36
@@ -12,7 +14,16 @@ struct NewConversationView: View {
         GeometryReader { geometry in
             ScrollView {
                 VStack(spacing: 0) {
-                    ConversationHeader()
+                    ConversationHeader(
+                        onHistory: {
+                            isPromptFocused = false
+                            onHistory()
+                        },
+                        onSettings: {
+                            isPromptFocused = false
+                            onSettings()
+                        }
+                    )
 
                     Text("小聊")
                         .font(.system(size: titleSize, weight: .bold))
@@ -71,7 +82,7 @@ struct NewConversationView: View {
         VStack(spacing: 8) {
             ZStack(alignment: .topLeading) {
                 if viewModel.prompt.isEmpty {
-                    Text("你可以选择提供聊天话题和对话发生的实际场景。")
+                    Text("请提供聊天话题和对话发生的实际场景，或点击按钮生成提示。")
                         .foregroundStyle(.black.opacity(0.73))
                         .padding(.horizontal, 5)
                         .padding(.top, 8)

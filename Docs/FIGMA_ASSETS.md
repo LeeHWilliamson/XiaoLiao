@@ -41,3 +41,19 @@ The RecordSurface PNG is exported at 2× resolution (494 × 162 pixels) and disp
 UI is laid out within real device safe areas. The mockup's black device outline, rounded device mask, and decorative scrollbar are not bundled. A real scroll view supplies scrolling and indicators when needed.
 
 Validation here checks asset existence, non-empty contents, image decoding, PDF page proportions, catalog references, and source callsites. The XCTest artwork check also loads every asset via UIImage on iOS. Effective rendering, tint, alignment, and tap regions still require the Xcode simulator comparison described in PLAN.md.
+
+## Milestone two — history and conversation settings
+
+Retrieved 2026-10-27 from history frame [`1:914`](https://www.figma.com/design/jVSZ8R37YkVCJOC32lLmMR/project_V2?node-id=1-914) and conversation-settings frame [`2:56`](https://www.figma.com/design/jVSZ8R37YkVCJOC32lLmMR/project_V2?node-id=2-56).
+
+| Asset | Source node | Export dimensions | App placement |
+| --- | --- | --- | --- |
+| BackRing | `1:1167` | 64 × 64 | Settings Back and history Close |
+| BackGlyph | `1:1169` | 17.4473 × 32.0012 | Centered inside BackRing |
+| SettingsRule | `2:63` | 314 × 1 | Below each settings section title |
+
+The drawer's source ring/glyph (`1:929`, `1:931`) were downloaded separately and verified byte-for-byte identical to the settings back artwork before reuse. Original SVGs were converted to vector PDF at their root dimensions using the same host librsvg/Cairo conversion as milestone one. No converter or font dependency was added to the app.
+
+The existing paper texture and watermark are reused. History colors are `#182332` (background), `#EDF2FF` (foreground and selected-row fill), `#174CD7` (selected-row text), `#E6DBC2` at 69% opacity (outside scrim), and `#B7C9FF` at 25% opacity (title glow). Settings use the existing `#D8C9A8` prompt color at 75% opacity and `#8FAA76` for selected options. These six additional named color assets leave AccentColor unchanged.
+
+History uses a native plain List for rows and separators, with the Figma pale trailing border. The settings capsules are custom branded controls: tan/green colors and 77-point height come from the Figma frame rather than the system segmented-control appearance. The user approved Apple system fonts in place of Inter and one “新对话” history row; other labels and visual patterns are retained. Runtime rendering still needs comparison in Xcode.

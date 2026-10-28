@@ -26,7 +26,7 @@ Acceptance: the target should remain buildable; users can enter or seed a topic,
 
 ### Implementation and verification status
 
-Milestone-one source work is complete. Stop here; Xcode acceptance remains pending.
+Milestone-one source work is complete. The user reported that the demo looks great; agent-side Xcode build/test acceptance remains unverified. The next authorized work is milestone two below.
 
 - Added SwiftUI New Conversation and Conversation Feed views, shared artwork controls, typed message/action models, deterministic fixtures, and an observable main-actor view model. The root owns navigation and feature state.
 - Added 27 original Figma image layers (PNG and vector PDF) and six color assets including AccentColor. Provenance and placement are documented in `Docs/FIGMA_ASSETS.md`.
@@ -48,22 +48,58 @@ Milestone-one source work is complete. Stop here; Xcode acceptance remains pendi
 - Check smaller iPhones, landscape, iPad layout, large accessibility text, Reduce Motion, and VoiceOver labels/order. Real scroll indicators appear only when there is scrollable content.
 - Confirm no microphone permission prompt or network requests occur. Settings, stats, recording, playback, and regeneration are intentionally unavailable.
 
-### Known design questions
+### Product decisions confirmed 2026-10-27
 
-1. The initial prompt says a topic is optional, but the empty frame disables “聊天”. Milestone one follows the visible disabled state; confirm whether future sessions should allow an empty prompt.
-2. Figma's learner translation is “我今天喝了杯咖啡”, which does not translate the turtle message. Preserve the supplied fixture for now; confirm corrected copy before implementing real translations.
-3. The temporary history-to-New-Conversation mapping is explicitly approved. Replace it with the designed history drawer only in a later, authorized milestone.
-4. Selected frames use different font sizes and green/white bubbles across voice/text modes. Follow the base feed for voice mode and `typed_message` for text mode; confirm final design normalization later.
+1. An initial prompt is required. Users must supply one or click prompt generation; the current suggestion button supplies a deterministic mock prompt. The original optional wording was a design-copy mistake, and the placeholder now reflects the required input.
+2. Leave the coffee/turtle mock mistranslation unchanged for now, as requested.
+3. Replace the temporary history-to-New-Conversation mapping with the history drawer. The user approved a “新对话” row at the top because the Figma drawer has no create control.
+4. Use Apple system fonts rather than Inter in the new history/settings views, as approved, with scaled text sizes.
+5. Keep the existing voice/text-mode bubble styles. Retain the reply-length labels from Figma, including “复杂”; no copy rewrite is part of this milestone.
 
-## Milestone 2 — remaining designed local flows (future)
+## Milestone 2 — conversation history and conversation settings
 
-Implement the existing history drawer, general/conversation settings, and conversation adjustment screen from Figma. Keep mock data local; define each screen's state and navigation from its frame before coding. Acceptance: the app builds and these approved flows work with local state. No additional screens without design references.
+Authorized scope: the history drawer (`1:914`) and conversation settings (`2:56`), using local state and the existing visual design. General settings and conversation adjustment remain future work. Stop after these two flows are ready for testing.
+
+- [x] Inspect high-fidelity Figma context and screenshots for both flows.
+- [x] Record the required-prompt decision, retained mock translation, approved New Conversation row, and system-font choice.
+- [x] Add typed settings and session models with per-conversation in-memory messages/settings.
+- [x] Open history from both screens, select/reopen an entry, dismiss with the red back control or scrim, and start a blank conversation via “新对话”.
+- [x] Preserve the navy drawer, pale selected row, blue selection text, red back artwork, cream paper background, and tan/green settings capsules.
+- [x] Enable tone, vocabulary, and reply-length selections; apply changes immediately and restore them with their history entry.
+- [x] Register new source/test files in the explicit Xcode groups and build phases.
+- [x] Add focused session-isolation tests and update UI flow tests for the new navigation.
+- [x] Finish static project/asset checks and document validation limits.
+- [ ] Build, run XCTest/UI tests, and compare both new views with Figma in Xcode.
+
+History is intentionally in memory for this milestone and resets on app relaunch. It starts with the Figma “乌龟” and B–J fixture rows; those rows reuse the existing turtle mock messages. Newly started conversations appear first with their own identity. Committed edits/submitted messages and settings are retained while switching entries; unsent drafts and message-action selection are cleared. Settings chosen before starting a conversation apply to that new conversation. “新对话” resets settings to casual/medium/medium.
+
+Both gear controls open Conversation Settings directly in this milestone. No general-settings intermediary or conversation-adjustment screen is implemented. Settings do not change the canned AI reply: no backend service is connected.
+
+### Milestone-two validation status
+
+- Static project checks passed: 15 app Swift files, three unit-test source files, and three UI-test source files are each registered once in the correct target. The asset catalog remains registered once in app Resources. Existing build configurations, target identifiers, signing, deployment target, and concurrency settings are unchanged.
+- Static asset checks passed for all 30 image assets and 12 color assets: catalog JSON, non-empty PNG/PDF files, PNG integrity, PDF page proportions, Swift callsites, and named-color references. The new SVG artwork was downloaded from Figma and converted to vector PDF; the drawer/settings back art was verified identical before reuse. No runtime network client, temporary Figma URL, or third-party package reference was added.
+- Added five session/history unit tests; added two UI flow tests and updated the earlier navigation test for the new drawer. These tests have not run here.
+- The simulator build command failed with `xcodebuild: command not found` (exit 127). No compilation or simulator comparison is claimed. The following Xcode checklist remains the acceptance step.
+
+Source implementation is ready for the user's testing. Stop after this milestone; do not begin audio, general settings, statistics, persistence, or backend integration.
+
+### Milestone-two Xcode checks
+
+- Confirm Features, Design, the two new views, and the new history unit-test file appear in the navigator. Build with the retained iOS 26.5 deployment settings and run all tests.
+- From New Conversation, check required prompt copy and generation; open/close history without losing the typed prompt. Open conversation settings, change all three controls, return, and start a conversation.
+- From the feed, open history and verify the current entry is highlighted. Switch to B, change its settings, then reopen the earlier entry and confirm its messages/settings remain independent.
+- Edit/send a local learner message, switch away and back, and confirm the committed content is retained. Start “新对话” and confirm the prompt is empty, Chat is disabled, settings are defaults, and previous entries remain available.
+- Dismiss history using both the red arrow and outside scrim; check neither action activates controls beneath the drawer.
+- Compare the drawer with `1:914` and settings with `2:56`, allowing only the approved New Conversation row/system-font substitutions and real safe-area layout.
+- Verify history scrolling, small iPhones, landscape, iPad, large accessibility text, VoiceOver focus/selected values, and Reduce Motion. Verify settings Back returns to the correct originating screen.
+- Relaunch and confirm the documented mock reset; persistence belongs to a future milestone. Recording, stats, and live AI generation must remain unavailable.
 
 ## Milestone 3 — local audio practice (future)
 
 Implement the designed recording, review, playback, and loading states with Apple audio APIs and explicit microphone permission handling. Confirm replay/edit behavior from Figma before implementation. Acceptance: recording/playback lifecycle works on device, with cancellation and interruption handling, and the app builds with its tests passing.
 
-## Milestone 4 — local history and designed statistics (future)
+## Milestone 4 — persisted history and designed statistics (future)
 
 Add persistence and the existing conversation/all-time statistics views once metric definitions are confirmed. Acceptance: sessions survive relaunch and local statistics match defined sample calculations; the app and tests build.
 

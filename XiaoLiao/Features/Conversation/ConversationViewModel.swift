@@ -10,10 +10,19 @@ final class ConversationViewModel {
     var prompt = ""
     var draft = ""
     var inputMode: InputMode = .voice
+    var settings = ConversationSettings() {
+        didSet { saveActiveConversation() }
+    }
+    private(set) var history: [ConversationSession]
+    private(set) var activeSessionID: String?
     private(set) var messages: [ConversationMessage] = []
     private(set) var selectedMessageID: String?
     private(set) var editingMessageID: String?
     private(set) var details: [String: Detail] = [:]
+
+    init(history: [ConversationSession]? = nil) {
+        self.history = history ?? MockConversation.history
+    }
 
     var canStart: Bool { !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
@@ -24,13 +33,40 @@ final class ConversationViewModel {
     @discardableResult
     func startConversation() -> Bool {
         guard canStart else { return false }
+        activeSessionID = nil
         messages = MockConversation.messages
-        selectedMessageID = nil
-        details = [:]
-        draft = ""
-        editingMessageID = nil
-        inputMode = .voice
+        resetPresentation()
+        let session = ConversationSession(
+            id: UUID().uuidString,
+            title: prompt == MockConversation.prompt ? "乌龟" : String(prompt.trimmingCharacters(in: .whitespacesAndNewlines).prefix(12)),
+            prompt: prompt,
+            messages: messages,
+            settings: settings
+        )
+        history.insert(session, at: 0)
+        activeSessionID = session.id
         return true
+    }
+
+    @discardableResult
+    func openConversation(_ id: String) -> Bool {
+        guard let session = history.first(where: { $0.id == id }) else { return false }
+        // Disable snapshot writes until all the selected session's state is restored.
+        activeSessionID = nil
+        prompt = session.prompt
+        messages = session.messages
+        settings = session.settings
+        resetPresentation()
+        activeSessionID = session.id
+        return true
+    }
+
+    func prepareNewConversation() {
+        activeSessionID = nil
+        prompt = ""
+        messages = []
+        settings = ConversationSettings()
+        resetPresentation()
     }
 
     func selectMessage(_ id: String) {
@@ -99,6 +135,7 @@ final class ConversationViewModel {
         draft = ""
         editingMessageID = nil
         selectedMessageID = nil
+        saveActiveConversation()
         return true
     }
 
@@ -110,5 +147,20 @@ final class ConversationViewModel {
 
     private func toggleDetail(_ detail: Detail, for id: String) {
         details[id] = details[id] == detail ? nil : detail
+    }
+
+    private func saveActiveConversation() {
+        guard let id = activeSessionID,
+              let index = history.firstIndex(where: { $0.id == id }) else { return }
+        history[index].messages = messages
+        history[index].settings = settings
+    }
+
+    private func resetPresentation() {
+        selectedMessageID = nil
+        details = [:]
+        draft = ""
+        editingMessageID = nil
+        inputMode = .voice
     }
 }

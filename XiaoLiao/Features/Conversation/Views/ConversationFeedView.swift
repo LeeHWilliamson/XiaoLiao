@@ -3,11 +3,21 @@ import SwiftUI
 struct ConversationFeedView: View {
     @Bindable var viewModel: ConversationViewModel
     let onHistory: () -> Void
+    let onSettings: () -> Void
     @FocusState private var isComposerFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
-            ConversationHeader(onHistory: onHistory)
+            ConversationHeader(
+                onHistory: {
+                    isComposerFocused = false
+                    onHistory()
+                },
+                onSettings: {
+                    isComposerFocused = false
+                    onSettings()
+                }
+            )
 
             GeometryReader { geometry in
                 ScrollViewReader { proxy in

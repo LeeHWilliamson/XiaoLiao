@@ -20,12 +20,12 @@ The project uses explicit Xcode groups and file references following a workaroun
 - Use SwiftUI and lightweight MVVM. Keep navigation in the root, presentation in views, state transitions in the feature view model, and mock content in a separate fixture.
 - Use value-type, identifiable messages and typed enums for actions and UI state. Use `@Observable` for the view model, `@State` for its owner, and `@Bindable` where views edit its properties. UI state belongs on the main actor.
 - Use feature directories; extract shared controls only when actually reused. Avoid speculative repositories, dependency containers, coordinators, and service protocols.
-- Keep data local and deterministic initially. No backend, AI API, authentication, network service, API keys, analytics, or persistence in milestone one. Do not imply that canned content is generated or translated live.
+- Keep data local and deterministic initially. Milestones one and two use in-memory state: no backend, AI API, authentication, network service, API keys, analytics, or disk persistence. Do not imply that canned content is generated or translated live.
 - Add no third-party dependencies unless necessary. Prefer Apple frameworks. Bundled PDF artwork is a build asset, not a runtime rendering dependency.
 - Use native layout, scrolling, text input, safe areas, and navigation. Preserve custom Figma artwork rather than replacing it with similar SF Symbols. Use SF Symbols only where the design names them.
 - Centralize brand colors. Use semantic text styles or scaled metrics for custom display sizes; provide VoiceOver labels, selection state, and at least 44-point action targets. Respect Reduce Motion. Do not bake a whole screen screenshot into the UI.
 - Add focused tests for consequential state transitions and navigation. Never claim tests passed or compilation succeeded unless the relevant command actually ran successfully.
-- Keep changes scoped to the requested milestone. Stop after milestone one until the user requests further work.
+- Keep changes scoped to the requested milestone. The current authorized milestone is conversation history and conversation settings; stop when those flows are ready for Xcode testing. General settings, conversation adjustment, statistics, audio, and backend integration remain future work.
 
 ## Design source and constraints
 
@@ -43,10 +43,16 @@ Primary references:
 | typed_message | `1:1035` | Existing text input pattern |
 | V2 • message_transcribe | `2:175` | Inline mock transcript |
 | V2 • translate_own_message | `2:371` | Inline mock translation |
+| new_convo_with_prompt (drawer open) | `1:914` | Conversation history drawer |
+| V2 • conversation_settings | `2:56` | Tone, vocabulary, and reply-length controls |
 
 Preserve the cream paper texture, brown outlined controls, green text bubbles, red voice control, Chinese UI copy, English messages, spacing, and adjacent action rails. Device outline/corner mask and status/home indicators in the mockup are device chrome, not app artwork. Use real scroll indicators; do not draw a fake scrollbar for a short feed.
 
-Do not invent screens, tab bars, menus, sheets, or interactions. For missing design states, inspect Figma or request specific screenshots instead of guessing. The user explicitly chose the existing top-left history control as the temporary route back to New Conversation; do not build the history drawer in milestone one. Keep settings/stats, recording, playback, and regeneration visibly present but unavailable until their milestone is authorized. Do not simulate successful recording or playback.
+Do not invent screens, tab bars, menus, sheets, or interactions. For missing design states, inspect Figma or request specific screenshots instead of guessing. The history control now opens the designed drawer on both conversation screens. The user explicitly approved a “新对话” row at its top and Apple system fonts in place of Inter for the new history/settings views. This replaces the milestone-one temporary history-to-New-Conversation mapping. Both gear controls open Conversation Settings; settings apply immediately to the current conversation or new-conversation draft, with no added Save action. Keep statistics, general settings, recording, playback, speaker switching, and regeneration unavailable. Do not simulate successful recording or playback.
+
+An initial prompt is required: users must type one or tap the prompt suggestion button (a deterministic local fixture for now). The user confirmed that the earlier “optional” wording was a mistake. Retain the coffee/turtle mock mistranslation for now, as explicitly requested.
+
+History entries retain their own committed messages and settings for the current app run. New Conversation clears the draft, selection, and settings to the Figma defaults without altering existing entries. Reopening history clears transient selection/unsent edits and restores that entry. Do not silently add disk persistence or generated history titles; local titles use the turtle fixture label or a short prompt prefix.
 
 Asset provenance is recorded in `Docs/FIGMA_ASSETS.md`. Never use temporary Figma URLs at runtime. Preserve original image proportions and asset-layer composition.
 

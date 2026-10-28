@@ -29,6 +29,9 @@ enum FigmaArtwork: String, CaseIterable {
     case microphoneGlyph = "MicrophoneGlyph"
     case transcriptDot = "TranscriptDot"
     case transcriptLine = "TranscriptLine"
+    case backRing = "BackRing"
+    case backGlyph = "BackGlyph"
+    case settingsRule = "SettingsRule"
 
     var size: CGSize {
         switch self {
@@ -59,6 +62,9 @@ enum FigmaArtwork: String, CaseIterable {
         case .microphoneGlyph: CGSize(width: 14.265, height: 26.5008)
         case .transcriptDot: CGSize(width: 17, height: 15)
         case .transcriptLine: CGSize(width: 182, height: 2)
+        case .backRing: CGSize(width: 64, height: 64)
+        case .backGlyph: CGSize(width: 17.4473, height: 32.0012)
+        case .settingsRule: CGSize(width: 314, height: 1)
         }
     }
 }

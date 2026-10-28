@@ -53,11 +53,12 @@ struct ArtworkButton: View {
 /// This is custom artwork in Figma, rather than a standard titled navigation bar.
 struct ConversationHeader: View {
     var onHistory: (() -> Void)?
+    var onSettings: (() -> Void)?
 
     var body: some View {
         HStack {
             ArtworkButton(
-                label: onHistory == nil ? "以前的对话" : "返回新对话",
+                label: "以前的对话",
                 glyph: .historyGlyph,
                 isAvailable: onHistory != nil,
                 action: { onHistory?() }
@@ -66,7 +67,10 @@ struct ConversationHeader: View {
             Spacer()
             ArtworkButton(label: "学习统计", glyph: .statsGlyph, isAvailable: false, action: unavailable)
             Spacer()
-            ArtworkButton(label: "设置", glyph: .settingsGlyph, isAvailable: false, action: unavailable)
+            ArtworkButton(label: "对话设置", glyph: .settingsGlyph, isAvailable: onSettings != nil) {
+                onSettings?()
+            }
+            .accessibilityIdentifier("conversation.settings")
         }
         .padding(.horizontal, 28)
         .padding(.top, 8)

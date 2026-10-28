@@ -7,6 +7,12 @@ enum XiaoLiaoTheme {
     static let prompt = Color("PromptSurface")
     static let promptBorder = Color("PromptBorder")
     static let watermark = Color("Watermark")
+    static let historyBackground = Color("HistoryBackground")
+    static let historyForeground = Color("HistoryForeground")
+    static let historySelectionInk = Color("HistorySelectionInk")
+    static let historyScrim = Color("HistoryScrim")
+    static let historyGlow = Color("HistoryGlow")
+    static let settingsSelection = Color("SettingsSelection")
 }
 
 struct PaperBackground: View {
