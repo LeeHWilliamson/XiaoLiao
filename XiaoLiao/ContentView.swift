@@ -3,7 +3,7 @@ import AVFoundation
 import Combine
 
 struct ContentView: View {
-    private enum Route: Hashable { case conversation, settings }
+    private enum Route: Hashable { case conversation, settings, statistics }
     @State private var path: [Route] = []
     @State private var conversation: ConversationViewModel
     @State private var isHistoryPresented = false
@@ -97,7 +97,8 @@ struct ContentView: View {
                     }
                 },
                 onHistory: presentHistory,
-                onSettings: showSettings
+                onSettings: showSettings,
+                onStatistics: showStatistics
             )
             .navigationDestination(for: Route.self) { route in
                 switch route {
@@ -105,10 +106,15 @@ struct ContentView: View {
                     ConversationFeedView(
                         viewModel: conversation,
                         onHistory: presentHistory,
-                        onSettings: showSettings
+                        onSettings: showSettings,
+                        onStatistics: showStatistics
                     )
                 case .settings:
                     ConversationSettingsView(viewModel: conversation) {
+                        if !path.isEmpty { path.removeLast() }
+                    }
+                case .statistics:
+                    StatisticsDashboardView(conversation: conversation) {
                         if !path.isEmpty { path.removeLast() }
                     }
                 }
@@ -134,6 +140,12 @@ struct ContentView: View {
         conversation.leaveFeed()
         conversation.deselectMessage()
         path.append(.settings)
+    }
+
+    private func showStatistics() {
+        conversation.leaveFeed()
+        conversation.deselectMessage()
+        path.append(.statistics)
     }
 }
 

@@ -23,6 +23,8 @@ nonisolated struct Message: Identifiable, Codable, Equatable, Sendable {
         case pending, sending, streaming, complete, failed
     }
 
+    enum Origin: String, Codable, Sendable { case interaction, fixture }
+
     enum Content: Codable, Equatable, Sendable {
         case text(String)
         case audio(AudioAttachment)
@@ -61,12 +63,15 @@ nonisolated struct Message: Identifiable, Codable, Equatable, Sendable {
     let revision: Int
     let transcription: Transcription?
     let status: Status?
+    /// Nil on older prototype records whose provenance was not recorded.
+    let origin: Origin?
 
     init(id: String = UUID().uuidString, logicalMessageID: String? = nil,
          replacesMessageID: String? = nil, conversationID: String, createdAt: Date = Date(),
          senderRole: SenderRole, purpose: Purpose = .conversationPractice,
          modality: Modality, content: Content, replyToMessageID: String? = nil,
-         revision: Int = 1, transcription: Transcription? = nil, status: Status? = .complete) {
+         revision: Int = 1, transcription: Transcription? = nil, status: Status? = .complete,
+         origin: Origin? = .interaction) {
         self.id = id
         self.logicalMessageID = logicalMessageID ?? id
         self.replacesMessageID = replacesMessageID
@@ -80,6 +85,7 @@ nonisolated struct Message: Identifiable, Codable, Equatable, Sendable {
         self.revision = revision
         self.transcription = transcription
         self.status = status
+        self.origin = origin
     }
 
     /// Derived from the chain link so a separate stored flag cannot disagree.
@@ -97,13 +103,24 @@ nonisolated struct Message: Identifiable, Codable, Equatable, Sendable {
                        conversationID: conversationID, createdAt: createdAt, senderRole: senderRole,
                        purpose: purpose, modality: modality,
                        content: .audio(AudioAttachment(storageKey: storageKey, durationSeconds: attachment.durationSeconds)),
-                       replyToMessageID: replyToMessageID, revision: revision, transcription: transcription, status: status)
+                       replyToMessageID: replyToMessageID, revision: revision, transcription: transcription, status: status, origin: origin)
     }
 
     func edited(content: Content, transcription: Transcription? = nil) -> Message {
         Message(logicalMessageID: logicalMessageID, replacesMessageID: id,
                 conversationID: conversationID, senderRole: senderRole, purpose: purpose,
                 modality: modality, content: content, replyToMessageID: replyToMessageID,
-                revision: revision + 1, transcription: transcription, status: .complete)
+                revision: revision + 1, transcription: transcription, status: .complete,
+                origin: senderRole == .user ? .interaction : origin)
+    }
+
+    var countsAsPractice: Bool {
+        senderRole == .user && purpose == .conversationPractice && origin == .interaction && status == .complete
+    }
+
+    var statisticsText: (text: String, source: ObservationMetadata.TextSource)? {
+        if modality == .spoken, let transcription { return (transcription.text, .speechTranscription) }
+        if case let .text(text) = content { return (text, .messageText) }
+        return nil
     }
 }

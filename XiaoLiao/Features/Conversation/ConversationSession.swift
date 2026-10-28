@@ -1,6 +1,6 @@
 import Foundation
 
-nonisolated struct ConversationSession: Identifiable, Equatable, Codable {
+nonisolated struct ConversationSession: Identifiable, Equatable, Codable, Sendable {
     let id: String
     let title: String
     let prompt: String
@@ -9,6 +9,36 @@ nonisolated struct ConversationSession: Identifiable, Equatable, Codable {
     var settings: ConversationSettings
     var grammarObservations: [GrammarObservation] = []
     var vocabularyObservations: [VocabularyObservation] = []
+    var textAnalyses: [MessageTextAnalysis] = []
+
+    init(id: String, title: String, prompt: String, messages: [Message], settings: ConversationSettings,
+         grammarObservations: [GrammarObservation] = [], vocabularyObservations: [VocabularyObservation] = [],
+         textAnalyses: [MessageTextAnalysis] = []) {
+        self.id = id
+        self.title = title
+        self.prompt = prompt
+        self.messages = messages
+        self.settings = settings
+        self.grammarObservations = grammarObservations
+        self.vocabularyObservations = vocabularyObservations
+        self.textAnalyses = textAnalyses
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, title, prompt, messages, settings, grammarObservations, vocabularyObservations, textAnalyses
+    }
+
+    init(from decoder: any Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decode(String.self, forKey: .id)
+        title = try values.decode(String.self, forKey: .title)
+        prompt = try values.decode(String.self, forKey: .prompt)
+        messages = try values.decode([Message].self, forKey: .messages)
+        settings = try values.decode(ConversationSettings.self, forKey: .settings)
+        grammarObservations = try values.decode([GrammarObservation].self, forKey: .grammarObservations)
+        vocabularyObservations = try values.decode([VocabularyObservation].self, forKey: .vocabularyObservations)
+        textAnalyses = try values.decodeIfPresent([MessageTextAnalysis].self, forKey: .textAnalyses) ?? []
+    }
 
     var latestMessages: [Message] { Self.latestVersions(in: messages) }
 
@@ -72,7 +102,9 @@ nonisolated struct ConversationSession: Identifiable, Equatable, Codable {
         guard Set(grammarObservations.map(\.id)).count == grammarObservations.count,
               Set(grammarObservations.map { $0.metadata.messageID }).count == grammarObservations.count,
               Set(vocabularyObservations.map(\.id)).count == vocabularyObservations.count,
-              Set(vocabularyObservations.map { $0.metadata.messageID }).count == vocabularyObservations.count else {
+              Set(vocabularyObservations.map { $0.metadata.messageID }).count == vocabularyObservations.count,
+              Set(textAnalyses.map(\.id)).count == textAnalyses.count,
+              Set(textAnalyses.map { $0.metadata.messageID }).count == textAnalyses.count else {
             throw ValidationError.invalidObservation
         }
         for observation in grammarObservations {
@@ -102,6 +134,10 @@ nonisolated struct ConversationSession: Identifiable, Equatable, Codable {
                 }
             }
         }
+        for analysis in textAnalyses {
+            let text = try evaluatedText(analysis.metadata, records: records)
+            try analysis.validate(text: text)
+        }
     }
 
     static func isRecordingKey(_ key: String) -> Bool {
@@ -128,10 +164,7 @@ nonisolated struct ConversationSession: Identifiable, Equatable, Codable {
     }
 
     private func validSpan(_ span: ObservationTextSpan, in text: String) -> Bool {
-        let count = text.utf16.count
-        guard span.startUTF16 >= 0, span.lengthUTF16 >= 0, span.startUTF16 <= count,
-              span.lengthUTF16 <= count - span.startUTF16 else { return false }
-        return Range(NSRange(location: span.startUTF16, length: span.lengthUTF16), in: text) != nil
+        span.range(in: text) != nil
     }
 
     private func validConfidence(_ value: Double?) -> Bool {

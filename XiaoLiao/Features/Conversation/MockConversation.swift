@@ -41,11 +41,11 @@ enum MockConversation {
             Message(id: partnerID, conversationID: conversationID, createdAt: timestamp,
                     senderRole: .aiPartner, modality: .spoken,
                     content: .audio(.init(storageKey: partnerAudioKey, durationSeconds: 5)),
-                    transcription: .init(text: "Do you love turtles?", confidence: nil)),
+                    transcription: .init(text: "Do you love turtles?", confidence: nil), origin: .fixture),
             Message(id: conversationID + ".learner-text", conversationID: conversationID,
                     createdAt: timestamp.addingTimeInterval(0.001), senderRole: .user, modality: .spoken,
                     content: .text("Yes, I also love turtles!"), replyToMessageID: partnerID,
-                    transcription: .init(text: "Yes, I also love turtles!", confidence: nil))
+                    transcription: .init(text: "Yes, I also love turtles!", confidence: nil), origin: .fixture)
         ]
     }
 

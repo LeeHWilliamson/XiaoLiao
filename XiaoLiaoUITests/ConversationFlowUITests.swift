@@ -12,6 +12,73 @@ final class ConversationFlowUITests: XCTestCase {
     }
 
     @MainActor
+    func testOverallStatisticsEmptySelectionAndReturnPreserveThePrompt() {
+        let app = XCUIApplication.isolatedHistoryApp()
+        app.launch()
+        app.buttons["conversation.suggest"].tap()
+        let prompt = app.textViews["conversation.prompt"].value as? String
+        let statistics = app.buttons["conversation.statistics"]
+        XCTAssertTrue(statistics.isEnabled)
+        statistics.tap()
+        XCTAssertTrue(app.staticTexts["stats.empty"].waitForExistence(timeout: 5))
+        let category = app.buttons["stats.grammar.category.tense-consistency"]
+        XCTAssertTrue(category.exists)
+        category.tap()
+        let trendLabel = app.staticTexts["stats.grammar.selected"]
+        scrollTo(trendLabel, in: app)
+        XCTAssertTrue(trendLabel.label.contains("时态一致性"))
+        app.buttons["stats.back"].tap()
+        XCTAssertTrue(app.buttons["conversation.start"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.textViews["conversation.prompt"].value as? String, prompt)
+        XCTAssertTrue(app.buttons["conversation.start"].isEnabled)
+    }
+
+    @MainActor
+    func testPopulatedOverallStatisticsSelectionAndActivityTable() {
+        let app = XCUIApplication.isolatedHistoryApp()
+        app.launchEnvironment["XIAOLIAO_UI_TEST_STATS_FIXTURE"] = "1"
+        app.launch()
+        app.buttons["conversation.statistics"].tap()
+        let articles = app.buttons["stats.grammar.category.article-usage"]
+        XCTAssertTrue(articles.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["stats.empty"].exists)
+        articles.tap()
+        scrollTo(app.staticTexts["stats.grammar.selected"], in: app)
+        XCTAssertTrue(app.staticTexts["stats.grammar.selected"].label.contains("冠词"))
+        let activity = app.descendants(matching: .any)["stats.activity.clausesPerSentence"].firstMatch
+        for _ in 0..<8 {
+            if activity.isHittable { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(activity.isHittable)
+        XCTAssertFalse(activity.label.contains("—"))
+    }
+
+    @MainActor
+    private func scrollTo(_ element: XCUIElement, in app: XCUIApplication) {
+        for _ in 0..<8 {
+            if element.isHittable { return }
+            app.swipeUp()
+        }
+    }
+
+    @MainActor
+    func testOverallStatisticsOpenedFromFeedReturnsToTheSameConversation() {
+        let app = XCUIApplication.isolatedHistoryApp()
+        app.launch()
+        app.buttons["conversation.suggest"].tap()
+        app.buttons["conversation.start"].tap()
+        let learner = fixtureBubble("learner-text", in: app)
+        XCTAssertTrue(learner.waitForExistence(timeout: 5))
+        let messageID = learner.identifier
+        app.buttons["conversation.statistics"].tap()
+        XCTAssertTrue(app.buttons["stats.back"].waitForExistence(timeout: 5))
+        app.buttons["stats.back"].tap()
+        XCTAssertTrue(app.buttons[messageID].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["conversation.record"].isEnabled)
+    }
+
+    @MainActor
     func testNavigationAndContextualActions() {
         let app = XCUIApplication.isolatedHistoryApp()
         app.launch()

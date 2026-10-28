@@ -40,6 +40,7 @@ final class ConversationViewModel {
     var messages: [Message] { ConversationSession.latestVersions(in: messageVersions) }
     private(set) var grammarObservations: [GrammarObservation] = []
     private(set) var vocabularyObservations: [VocabularyObservation] = []
+    private(set) var textAnalyses: [MessageTextAnalysis] = []
     @ObservationIgnored private var temporaryRecordings: [String: LocalAudioClip] = [:]
     private(set) var selectedMessageID: String?
     private(set) var editingMessageID: String?
@@ -106,6 +107,7 @@ final class ConversationViewModel {
         messageVersions = saved.messages
         grammarObservations = saved.grammarObservations
         vocabularyObservations = saved.vocabularyObservations
+        textAnalyses = saved.textAnalyses
         resetPresentation()
         history.insert(saved, at: 0)
         activeSessionID = saved.id
@@ -122,6 +124,7 @@ final class ConversationViewModel {
         messageVersions = session.messages
         grammarObservations = session.grammarObservations
         vocabularyObservations = session.vocabularyObservations
+        textAnalyses = session.textAnalyses
         settings = session.settings
         resetPresentation()
         activeSessionID = session.id
@@ -134,6 +137,7 @@ final class ConversationViewModel {
         messageVersions = []
         grammarObservations = []
         vocabularyObservations = []
+        textAnalyses = []
         settings = ConversationSettings()
         resetPresentation()
     }
@@ -382,6 +386,7 @@ final class ConversationViewModel {
         messageVersions = saved.messages
         grammarObservations = saved.grammarObservations
         vocabularyObservations = saved.vocabularyObservations
+        textAnalyses = saved.textAnalyses
         if settings != saved.settings {
             isRestoringSettings = true
             settings = saved.settings
@@ -406,6 +411,27 @@ final class ConversationViewModel {
         session.vocabularyObservations.removeAll { $0.metadata.messageID == observation.metadata.messageID }
         session.vocabularyObservations.append(observation)
         return commitSession(session)
+    }
+
+    @discardableResult
+    func recordTextAnalysis(_ analysis: MessageTextAnalysis) -> Bool {
+        guard let index = history.firstIndex(where: { $0.id == activeSessionID }) else { return false }
+        var session = history[index]
+        session.textAnalyses.removeAll { $0.metadata.messageID == analysis.metadata.messageID }
+        session.textAnalyses.append(analysis)
+        return commitSession(session)
+    }
+
+    /// Extract supplied analysis into a fresh snapshot, without blocking UI or
+    /// mutating conversation data. Future statistics views can request this.
+    func statisticsSnapshot(configuration: StatisticsConfiguration = .init(), interval: DateInterval? = nil,
+                            calendar: Calendar = .current) async throws -> StatisticsSnapshot {
+        guard storageDirectory == nil || isStorageReady else { throw CocoaError(.fileReadUnknown) }
+        let sessions = history
+        return try await Task.detached(priority: .utility) {
+            try StatisticsCalculator.snapshot(sessions: sessions, configuration: configuration,
+                                              interval: interval, calendar: calendar)
+        }.value
     }
 
     func translation(for message: Message) -> String? { MockConversation.translation(for: message) }

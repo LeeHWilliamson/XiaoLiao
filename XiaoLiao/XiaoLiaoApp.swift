@@ -20,6 +20,9 @@ struct XiaoLiaoApp: App {
     private static func makeConversation() -> ConversationViewModel {
         #if DEBUG
         if let testID = ProcessInfo.processInfo.environment["XIAOLIAO_UI_TEST_STORE"], UUID(uuidString: testID) != nil {
+            if ProcessInfo.processInfo.environment["XIAOLIAO_UI_TEST_STATS_FIXTURE"] == "1" {
+                return ConversationViewModel(history: StatisticsPreviewData.sessions)
+            }
             let directory = URL.applicationSupportDirectory
                 .appendingPathComponent("XiaoLiaoUITests", isDirectory: true)
                 .appendingPathComponent(testID, isDirectory: true)

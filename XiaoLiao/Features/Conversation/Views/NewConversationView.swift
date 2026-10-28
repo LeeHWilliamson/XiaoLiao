@@ -5,6 +5,7 @@ struct NewConversationView: View {
     let onStart: () -> Void
     let onHistory: () -> Void
     let onSettings: () -> Void
+    let onStatistics: () -> Void
     @FocusState private var isPromptFocused: Bool
     @ScaledMetric(relativeTo: .largeTitle) private var titleSize: CGFloat = 48
     @ScaledMetric(relativeTo: .largeTitle) private var subtitleSize: CGFloat = 36
@@ -22,6 +23,10 @@ struct NewConversationView: View {
                         onSettings: {
                             isPromptFocused = false
                             onSettings()
+                        },
+                        onStatistics: {
+                            isPromptFocused = false
+                            onStatistics()
                         }
                     )
 

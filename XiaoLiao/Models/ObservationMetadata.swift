@@ -47,4 +47,11 @@ nonisolated struct ObservationCategory: Codable, Equatable, Hashable, Sendable {
 nonisolated struct ObservationTextSpan: Codable, Equatable, Hashable, Sendable {
     let startUTF16: Int
     let lengthUTF16: Int
+
+    func range(in text: String) -> Range<String.Index>? {
+        let count = text.utf16.count
+        guard startUTF16 >= 0, lengthUTF16 >= 0, startUTF16 <= count,
+              lengthUTF16 <= count - startUTF16 else { return nil }
+        return Range(NSRange(location: startUTF16, length: lengthUTF16), in: text)
+    }
 }

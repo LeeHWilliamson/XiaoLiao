@@ -54,6 +54,7 @@ struct ArtworkButton: View {
 struct ConversationHeader: View {
     var onHistory: (() -> Void)?
     var onSettings: (() -> Void)?
+    var onStatistics: (() -> Void)?
 
     var body: some View {
         HStack {
@@ -65,7 +66,10 @@ struct ConversationHeader: View {
             )
             .accessibilityIdentifier("conversation.history")
             Spacer()
-            ArtworkButton(label: "学习统计", glyph: .statsGlyph, isAvailable: false, action: unavailable)
+            ArtworkButton(label: "全部学习统计", glyph: .statsGlyph, isAvailable: onStatistics != nil) {
+                onStatistics?()
+            }
+            .accessibilityIdentifier("conversation.statistics")
             Spacer()
             ArtworkButton(label: "对话设置", glyph: .settingsGlyph, isAvailable: onSettings != nil) {
                 onSettings?()
@@ -75,9 +79,5 @@ struct ConversationHeader: View {
         .padding(.horizontal, 28)
         .padding(.top, 8)
         .padding(.bottom, 8)
-    }
-
-    private func unavailable() {
-        // Disabled until the corresponding designed screen is in scope.
     }
 }

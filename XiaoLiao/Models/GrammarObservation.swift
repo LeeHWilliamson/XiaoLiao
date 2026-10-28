@@ -4,6 +4,19 @@ import Foundation
 /// Counts, accuracy metrics, and error lists can later be derived from these
 /// opportunities; no duplicated summary counters or evaluator logic live here.
 nonisolated struct GrammarObservation: Identifiable, Codable, Equatable, Sendable {
+    /// Statistics taxonomy. Other category codes remain valid observations but
+    /// do not silently enter the dashboard's tracked metrics.
+    enum TrackedCategory: String, CaseIterable, Codable, Equatable, Sendable {
+        case verbTense = "verb-tense"
+        case tenseConsistency = "tense-consistency"
+        case articles = "article-usage"
+        case prepositions = "preposition-usage"
+        case subjectVerbAgreement = "subject-verb-agreement"
+
+        var observationCategory: ObservationCategory {
+            ObservationCategory(categoryID: rawValue, subcategoryID: nil)
+        }
+    }
     enum Outcome: String, Codable, Sendable {
         case correct, incorrect, uncertain
     }
