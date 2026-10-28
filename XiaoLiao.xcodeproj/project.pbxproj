@@ -6,6 +6,26 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		F3B2E18620A9880C11CF9D06 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 4A200E41D93550D818E573F7 /* Assets.xcassets */; };
+		FBFA0F4C1C46951B674946E4 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D5863E0BE9FCF99EBB70A86 /* ContentView.swift */; };
+		6616BFE473AB684422612C8D /* ArtworkControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = D382F5CCF2097A77FAB5D54B /* ArtworkControls.swift */; };
+		013554A311D3F02E2E8AD236 /* FigmaArtwork.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCF551D6462839D4227EFAF3 /* FigmaArtwork.swift */; };
+		583860D69D3FA072F8F4622A /* XiaoLiaoTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E06E7D280A0D31F527F5221 /* XiaoLiaoTheme.swift */; };
+		24EE6BF05565EAED2CE53FD4 /* ConversationMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = E35803FF8B2EA81DFD22F86C /* ConversationMessage.swift */; };
+		90C4A65BE430C6354E516A02 /* ConversationViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15DAF8F9472318FFEA46A8F9 /* ConversationViewModel.swift */; };
+		B407E0A321050938766704E5 /* MockConversation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5730F3FA603CD5C3B2FCDAAA /* MockConversation.swift */; };
+		C7AF37CF077EC0A4F634638B /* ConversationFeedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66DEB44CD525007373E3460C /* ConversationFeedView.swift */; };
+		4745AA892274CCD52040C9C3 /* MessageRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB3A5A37E3F580A84DB8FD68 /* MessageRow.swift */; };
+		8BF621F7EC756DFA151CE9EF /* NewConversationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9989CCE53E12AD9D43289FFE /* NewConversationView.swift */; };
+		E43DC204E06F68367E0F1AB8 /* XiaoLiaoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 351DFBCF4B77092FFEAFE03D /* XiaoLiaoApp.swift */; };
+		608FDCB81BC1AFFCF6A5CC37 /* ConversationViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FD54F76EACD24794366F589 /* ConversationViewModelTests.swift */; };
+		528894A1113B41878B13F593 /* XiaoLiaoTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C763B5ECEE8F95A3B023B26 /* XiaoLiaoTests.swift */; };
+		CC3E517AA8D9EB08588DB86E /* ConversationFlowUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BBB16F204B79D700B2979BF /* ConversationFlowUITests.swift */; };
+		3C30CA3EDACF8A8B34A2E758 /* XiaoLiaoUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B165EEE0C88B88767E310AC8 /* XiaoLiaoUITests.swift */; };
+		8DC9748FED1CA15F755682DE /* XiaoLiaoUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 233CBD84CA1955C78AF41FE5 /* XiaoLiaoUITestsLaunchTests.swift */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		3CF4D9813090438700EBB3F1 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -24,28 +44,31 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		4A200E41D93550D818E573F7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		2D5863E0BE9FCF99EBB70A86 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		D382F5CCF2097A77FAB5D54B /* ArtworkControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkControls.swift; sourceTree = "<group>"; };
+		FCF551D6462839D4227EFAF3 /* FigmaArtwork.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaArtwork.swift; sourceTree = "<group>"; };
+		3E06E7D280A0D31F527F5221 /* XiaoLiaoTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XiaoLiaoTheme.swift; sourceTree = "<group>"; };
+		E35803FF8B2EA81DFD22F86C /* ConversationMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationMessage.swift; sourceTree = "<group>"; };
+		15DAF8F9472318FFEA46A8F9 /* ConversationViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationViewModel.swift; sourceTree = "<group>"; };
+		5730F3FA603CD5C3B2FCDAAA /* MockConversation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockConversation.swift; sourceTree = "<group>"; };
+		66DEB44CD525007373E3460C /* ConversationFeedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationFeedView.swift; sourceTree = "<group>"; };
+		FB3A5A37E3F580A84DB8FD68 /* MessageRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageRow.swift; sourceTree = "<group>"; };
+		9989CCE53E12AD9D43289FFE /* NewConversationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewConversationView.swift; sourceTree = "<group>"; };
+		351DFBCF4B77092FFEAFE03D /* XiaoLiaoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XiaoLiaoApp.swift; sourceTree = "<group>"; };
+		1FD54F76EACD24794366F589 /* ConversationViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationViewModelTests.swift; sourceTree = "<group>"; };
+		9C763B5ECEE8F95A3B023B26 /* XiaoLiaoTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XiaoLiaoTests.swift; sourceTree = "<group>"; };
+		7BBB16F204B79D700B2979BF /* ConversationFlowUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationFlowUITests.swift; sourceTree = "<group>"; };
+		B165EEE0C88B88767E310AC8 /* XiaoLiaoUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XiaoLiaoUITests.swift; sourceTree = "<group>"; };
+		233CBD84CA1955C78AF41FE5 /* XiaoLiaoUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XiaoLiaoUITestsLaunchTests.swift; sourceTree = "<group>"; };
+		A042A750E5204C8392B8DB01 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		A042A750E5204C8392B8DB02 /* AGENTS.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = AGENTS.md; sourceTree = "<group>"; };
+		A042A750E5204C8392B8DB03 /* PLAN.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = PLAN.md; sourceTree = "<group>"; };
+		A042A750E5204C8392B8DB04 /* FIGMA_ASSETS.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = FIGMA_ASSETS.md; sourceTree = "<group>"; };
 		3CF4D9733090438400EBB3F1 /* XiaoLiao.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = XiaoLiao.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3CF4D9803090438700EBB3F1 /* XiaoLiaoTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = XiaoLiaoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		3CF4D98A3090438700EBB3F1 /* XiaoLiaoUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = XiaoLiaoUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
-
-/* Begin PBXFileSystemSynchronizedRootGroup section */
-		3CF4D9753090438400EBB3F1 /* XiaoLiao */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = XiaoLiao;
-			sourceTree = "<group>";
-		};
-		3CF4D9833090438700EBB3F1 /* XiaoLiaoTests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = XiaoLiaoTests;
-			sourceTree = "<group>";
-		};
-		3CF4D98D3090438700EBB3F1 /* XiaoLiaoUITests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = XiaoLiaoUITests;
-			sourceTree = "<group>";
-		};
-/* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		3CF4D9703090438400EBB3F1 /* Frameworks */ = {
@@ -72,14 +95,96 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		3CF4D9753090438400EBB3F1 /* XiaoLiao */ = {
+			isa = PBXGroup;
+			children = (
+				774F043D1272581DB05AC54C /* Design */,
+				C8DDD855B6A39072A1326ABE /* Features */,
+				4A200E41D93550D818E573F7 /* Assets.xcassets */,
+				2D5863E0BE9FCF99EBB70A86 /* ContentView.swift */,
+				351DFBCF4B77092FFEAFE03D /* XiaoLiaoApp.swift */,
+			);
+			path = XiaoLiao;
+			sourceTree = "<group>";
+		};
+		774F043D1272581DB05AC54C /* Design */ = {
+			isa = PBXGroup;
+			children = (
+				D382F5CCF2097A77FAB5D54B /* ArtworkControls.swift */,
+				FCF551D6462839D4227EFAF3 /* FigmaArtwork.swift */,
+				3E06E7D280A0D31F527F5221 /* XiaoLiaoTheme.swift */,
+			);
+			path = Design;
+			sourceTree = "<group>";
+		};
+		C8DDD855B6A39072A1326ABE /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				E329F95D46805A532206D6A3 /* Conversation */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+		E329F95D46805A532206D6A3 /* Conversation */ = {
+			isa = PBXGroup;
+			children = (
+				4292123CDC2C6D4EABDA20B3 /* Views */,
+				E35803FF8B2EA81DFD22F86C /* ConversationMessage.swift */,
+				15DAF8F9472318FFEA46A8F9 /* ConversationViewModel.swift */,
+				5730F3FA603CD5C3B2FCDAAA /* MockConversation.swift */,
+			);
+			path = Conversation;
+			sourceTree = "<group>";
+		};
+		4292123CDC2C6D4EABDA20B3 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				66DEB44CD525007373E3460C /* ConversationFeedView.swift */,
+				FB3A5A37E3F580A84DB8FD68 /* MessageRow.swift */,
+				9989CCE53E12AD9D43289FFE /* NewConversationView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		3CF4D9833090438700EBB3F1 /* XiaoLiaoTests */ = {
+			isa = PBXGroup;
+			children = (
+				1FD54F76EACD24794366F589 /* ConversationViewModelTests.swift */,
+				9C763B5ECEE8F95A3B023B26 /* XiaoLiaoTests.swift */,
+			);
+			path = XiaoLiaoTests;
+			sourceTree = "<group>";
+		};
+		3CF4D98D3090438700EBB3F1 /* XiaoLiaoUITests */ = {
+			isa = PBXGroup;
+			children = (
+				7BBB16F204B79D700B2979BF /* ConversationFlowUITests.swift */,
+				B165EEE0C88B88767E310AC8 /* XiaoLiaoUITests.swift */,
+				233CBD84CA1955C78AF41FE5 /* XiaoLiaoUITestsLaunchTests.swift */,
+			);
+			path = XiaoLiaoUITests;
+			sourceTree = "<group>";
+		};
 		3CF4D96A3090438400EBB3F1 = {
 			isa = PBXGroup;
 			children = (
+				A042A750E5204C8392B8DB01 /* README.md */,
+				A042A750E5204C8392B8DB02 /* AGENTS.md */,
+				A042A750E5204C8392B8DB03 /* PLAN.md */,
+				A042A750E5204C8392B8DB05 /* Docs */,
 				3CF4D9753090438400EBB3F1 /* XiaoLiao */,
 				3CF4D9833090438700EBB3F1 /* XiaoLiaoTests */,
 				3CF4D98D3090438700EBB3F1 /* XiaoLiaoUITests */,
 				3CF4D9743090438400EBB3F1 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		A042A750E5204C8392B8DB05 /* Docs */ = {
+			isa = PBXGroup;
+			children = (
+				A042A750E5204C8392B8DB04 /* FIGMA_ASSETS.md */,
+			);
+			path = Docs;
 			sourceTree = "<group>";
 		};
 		3CF4D9743090438400EBB3F1 /* Products */ = {
@@ -107,9 +212,6 @@
 			);
 			dependencies = (
 			);
-			fileSystemSynchronizedGroups = (
-				3CF4D9753090438400EBB3F1 /* XiaoLiao */,
-			);
 			name = XiaoLiao;
 			packageProductDependencies = (
 			);
@@ -130,9 +232,6 @@
 			dependencies = (
 				3CF4D9823090438700EBB3F1 /* PBXTargetDependency */,
 			);
-			fileSystemSynchronizedGroups = (
-				3CF4D9833090438700EBB3F1 /* XiaoLiaoTests */,
-			);
 			name = XiaoLiaoTests;
 			packageProductDependencies = (
 			);
@@ -152,9 +251,6 @@
 			);
 			dependencies = (
 				3CF4D98C3090438700EBB3F1 /* PBXTargetDependency */,
-			);
-			fileSystemSynchronizedGroups = (
-				3CF4D98D3090438700EBB3F1 /* XiaoLiaoUITests */,
 			);
 			name = XiaoLiaoUITests;
 			packageProductDependencies = (
@@ -212,6 +308,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F3B2E18620A9880C11CF9D06 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -236,6 +333,17 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				FBFA0F4C1C46951B674946E4 /* ContentView.swift in Sources */,
+				6616BFE473AB684422612C8D /* ArtworkControls.swift in Sources */,
+				013554A311D3F02E2E8AD236 /* FigmaArtwork.swift in Sources */,
+				583860D69D3FA072F8F4622A /* XiaoLiaoTheme.swift in Sources */,
+				24EE6BF05565EAED2CE53FD4 /* ConversationMessage.swift in Sources */,
+				90C4A65BE430C6354E516A02 /* ConversationViewModel.swift in Sources */,
+				B407E0A321050938766704E5 /* MockConversation.swift in Sources */,
+				C7AF37CF077EC0A4F634638B /* ConversationFeedView.swift in Sources */,
+				4745AA892274CCD52040C9C3 /* MessageRow.swift in Sources */,
+				8BF621F7EC756DFA151CE9EF /* NewConversationView.swift in Sources */,
+				E43DC204E06F68367E0F1AB8 /* XiaoLiaoApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -243,6 +351,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				608FDCB81BC1AFFCF6A5CC37 /* ConversationViewModelTests.swift in Sources */,
+				528894A1113B41878B13F593 /* XiaoLiaoTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -250,6 +360,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CC3E517AA8D9EB08588DB86E /* ConversationFlowUITests.swift in Sources */,
+				3C30CA3EDACF8A8B34A2E758 /* XiaoLiaoUITests.swift in Sources */,
+				8DC9748FED1CA15F755682DE /* XiaoLiaoUITestsLaunchTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -13,7 +13,7 @@ Native SwiftUI iOS app for Chinese speakers practicing conversational English.
 - `XiaoLiaoTests/`, `XiaoLiaoUITests/`: behavior and navigation tests.
 - `PLAN.md`: milestones, validation status, and open design questions.
 
-The starter uses filesystem-synchronized groups: Swift files beneath the target directories are discovered automatically. Avoid unnecessary project-file edits. Preserve the existing iOS 26.5 deployment target, bundle identifiers, signing, Swift language mode, and concurrency settings unless explicitly asked to change them.
+The project uses explicit Xcode groups and file references following a workaround for source folders missing from the Project navigator. When adding Swift files, add their file references to the appropriate group and register each once in its target's Sources build phase. Register asset catalogs once in Resources; keep project documentation out of build phases. Avoid other unnecessary project-file edits. Preserve the existing iOS 26.5 deployment target, bundle identifiers, signing, Swift language mode, and concurrency settings unless explicitly asked to change them.
 
 ## Architecture and conventions
 
