@@ -1,5 +1,5 @@
-struct ConversationSettings: Equatable {
-    enum Tone: String, CaseIterable, Identifiable {
+nonisolated struct ConversationSettings: Equatable, Codable {
+    enum Tone: String, CaseIterable, Identifiable, Codable {
         case warm, casual, formal
         var id: String { rawValue }
         var title: String {
@@ -11,7 +11,7 @@ struct ConversationSettings: Equatable {
         }
     }
 
-    enum Vocabulary: String, CaseIterable, Identifiable {
+    enum Vocabulary: String, CaseIterable, Identifiable, Codable {
         case simple, medium, complex
         var id: String { rawValue }
         var title: String {
@@ -23,7 +23,7 @@ struct ConversationSettings: Equatable {
         }
     }
 
-    enum ReplyLength: String, CaseIterable, Identifiable {
+    enum ReplyLength: String, CaseIterable, Identifiable, Codable {
         case brief, medium, complex
         var id: String { rawValue }
         var title: String {

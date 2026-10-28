@@ -9,11 +9,28 @@ final class ConversationViewModel {
 
     let audio: ConversationAudioController
 
+    struct StorageIssue: Equatable {
+        let message: String
+        var canRetryLoading = false
+    }
+    var storageIssue: StorageIssue?
+    @ObservationIgnored private var historyStore: ConversationHistoryStore?
+    @ObservationIgnored private var storageDirectory: URL?
+    @ObservationIgnored private var isStorageReady = false
+    @ObservationIgnored private var isRestoringSettings = false
+
     var prompt = ""
     var draft = ""
     var inputMode: InputMode = .voice
     var settings = ConversationSettings() {
-        didSet { saveActiveConversation() }
+        didSet {
+            guard !isRestoringSettings else { return }
+            if !saveActiveConversation() {
+                isRestoringSettings = true
+                settings = oldValue
+                isRestoringSettings = false
+            }
+        }
     }
     private(set) var history: [ConversationSession]
     private(set) var activeSessionID: String?
@@ -27,6 +44,39 @@ final class ConversationViewModel {
         self.audio = audio ?? ConversationAudioController()
     }
 
+    /// The app opts into disk storage explicitly; tests and previews stay isolated.
+    static func persistent(directory: URL? = nil) -> ConversationViewModel {
+        let model = ConversationViewModel(history: [])
+        model.storageDirectory = directory ?? ConversationHistoryStore.defaultDirectory
+        model.retryLoadingHistory()
+        return model
+    }
+
+    static func persistent(store: ConversationHistoryStore) -> ConversationViewModel {
+        let model = ConversationViewModel(history: [])
+        model.storageDirectory = store.directory
+        model.historyStore = store
+        model.retryLoadingHistory()
+        return model
+    }
+
+    func retryLoadingHistory() {
+        guard let storageDirectory else { return }
+        do {
+            let store = try historyStore ?? ConversationHistoryStore(directory: storageDirectory)
+            let sessions = try store.load()
+            historyStore = store
+            isStorageReady = true
+            history = sessions
+            storageIssue = sessions.flatMap(\.messages).contains(where: {
+                $0.localAudio.map { !FileManager.default.fileExists(atPath: $0.url.path) } ?? false
+            }) ? StorageIssue(message: "部分录音文件暂不可用。对话文字和设置仍已保留。") : nil
+        } catch {
+            isStorageReady = false
+            storageIssue = StorageIssue(message: "无法读取本地历史。已有数据未被清除。请稍后重试。", canRetryLoading: true)
+        }
+    }
+
     var canStart: Bool { !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
     func suggestPrompt() {
@@ -36,18 +86,19 @@ final class ConversationViewModel {
     @discardableResult
     func startConversation() -> Bool {
         guard canStart else { return false }
-        activeSessionID = nil
-        messages = MockConversation.messages
-        resetPresentation()
         let session = ConversationSession(
             id: UUID().uuidString,
             title: prompt == MockConversation.prompt ? "乌龟" : String(prompt.trimmingCharacters(in: .whitespacesAndNewlines).prefix(12)),
             prompt: prompt,
-            messages: messages,
+            messages: MockConversation.messages,
             settings: settings
         )
-        history.insert(session, at: 0)
-        activeSessionID = session.id
+        guard let saved = persist(session) else { return false }
+        activeSessionID = nil
+        messages = saved.messages
+        resetPresentation()
+        history.insert(saved, at: 0)
+        activeSessionID = saved.id
         return true
     }
 
@@ -148,28 +199,29 @@ final class ConversationViewModel {
     func submitDraft() -> Bool {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, !audio.hasDraft else { return false }
+        var updated = messages
         if let id = editingMessageID {
             guard canEditMessage(id),
                   let index = messages.firstIndex(where: { $0.id == id }),
                   messages[index].localAudio == nil,
                   case .text = messages[index].content else { return false }
-            messages[index].content = .text(text)
+            updated[index].content = .text(text)
             // An edited sentence no longer has a valid canned translation.
-            messages[index].mockTranslation = nil
-            details[id] = nil
+            updated[index].mockTranslation = nil
         } else {
-            messages.append(ConversationMessage(
+            updated.append(ConversationMessage(
                 id: UUID().uuidString,
                 sender: .learner,
                 communicationMethod: .text,
                 content: .text(text)
             ))
         }
+        guard commitMessages(updated) else { return false }
+        if let id = editingMessageID { details[id] = nil }
         audio.stopPlayback()
         draft = ""
         editingMessageID = nil
         selectedMessageID = nil
-        saveActiveConversation()
         return true
     }
 
@@ -199,9 +251,11 @@ final class ConversationViewModel {
         let replacementID = editingMessageID
         guard let clip = await audio.finishDraft() else { return false }
         guard commitRecording(clip, in: sessionID, replacing: replacementID) else {
-            audio.discard(clip)
+            // A storage failure keeps the review row/clip available for retry.
+            // Navigation cancellation already invalidates and deletes its own draft.
             return false
         }
+        audio.completeSend()
         return true
     }
 
@@ -209,21 +263,22 @@ final class ConversationViewModel {
     /// after asynchronous work so navigation or a later message cannot replace the wrong reply.
     @discardableResult
     func commitRecording(_ clip: LocalAudioClip, in sessionID: String, replacing id: String? = nil) -> Bool {
-        guard activeSessionID == sessionID, clip.duration.isFinite, clip.duration > 0,
+        guard activeSessionID == sessionID, clip.duration.isFinite, clip.duration > 0, clip.duration < Double(Int.max) / 2,
               FileManager.default.fileExists(atPath: clip.url.path) else { return false }
         let label = "语音消息 · \(clip.durationLabel)"
+        var updated = messages
+        var previousClip: LocalAudioClip?
         if let id {
             guard editingMessageID == id, canEditMessage(id),
                   let index = messages.firstIndex(where: { $0.id == id }),
                   let previous = messages[index].localAudio else { return false }
-            messages[index].content = .text(label)
-            messages[index].localAudio = clip
-            messages[index].mockTranslation = nil
-            details[id] = nil
-            if previous.url != clip.url { audio.discard(previous) }
+            updated[index].content = .text(label)
+            updated[index].localAudio = clip
+            updated[index].mockTranslation = nil
+            previousClip = previous
         } else {
             guard editingMessageID == nil else { return false }
-            messages.append(ConversationMessage(
+            updated.append(ConversationMessage(
                 id: UUID().uuidString,
                 sender: .learner,
                 communicationMethod: .voice,
@@ -231,10 +286,17 @@ final class ConversationViewModel {
                 localAudio: clip
             ))
         }
+        guard commitMessages(updated) else { return false }
+        if let id { details[id] = nil }
+        if let previousClip, previousClip.url != clip.url, historyStore?.owns(previousClip) != true {
+            audio.discard(previousClip)
+        }
+        if let historyStore, !historyStore.owns(clip) {
+            audio.discard(clip)
+        }
         draft = ""
         editingMessageID = nil
         selectedMessageID = nil
-        saveActiveConversation()
         return true
     }
 
@@ -253,11 +315,39 @@ final class ConversationViewModel {
         details[id] = details[id] == detail ? nil : detail
     }
 
-    private func saveActiveConversation() {
+    @discardableResult
+    private func saveActiveConversation() -> Bool {
         guard let id = activeSessionID,
-              let index = history.firstIndex(where: { $0.id == id }) else { return }
-        history[index].messages = messages
-        history[index].settings = settings
+              history.contains(where: { $0.id == id }) else { return true }
+        return commitMessages(messages)
+    }
+
+    private func commitMessages(_ updated: [ConversationMessage]) -> Bool {
+        guard let id = activeSessionID,
+              let index = history.firstIndex(where: { $0.id == id }) else { return false }
+        var session = history[index]
+        session.messages = updated
+        session.settings = settings
+        guard let saved = persist(session) else { return false }
+        history[index] = saved
+        messages = saved.messages
+        return true
+    }
+
+    private func persist(_ session: ConversationSession) -> ConversationSession? {
+        guard storageDirectory != nil else { return session }
+        guard isStorageReady, let historyStore else {
+            storageIssue = StorageIssue(message: "本地历史尚未打开，操作未保存。请重试读取历史。", canRetryLoading: true)
+            return nil
+        }
+        do {
+            let saved = try historyStore.save(session)
+            storageIssue = nil
+            return saved
+        } catch {
+            storageIssue = StorageIssue(message: "无法保存本地历史，操作尚未完成。请检查可用储存空间后重试；原有对话仍已保留。")
+            return nil
+        }
     }
 
     private func canEditMessage(_ id: String) -> Bool {

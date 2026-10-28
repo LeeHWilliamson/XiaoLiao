@@ -6,9 +6,10 @@ Native SwiftUI iOS app for Chinese speakers practicing conversational English.
 
 - `XiaoLiao.xcodeproj`: existing Xcode project; app, XCTest, and UI-test targets.
 - `XiaoLiao/XiaoLiaoApp.swift`: app entry point.
-- `XiaoLiao/ContentView.swift`: root navigation and shared feature state.
+- `XiaoLiao/ContentView.swift`: root navigation and shared feature state supplied by the app entry point.
 - `XiaoLiao/Features/Conversation/`: conversation models, local fixtures, view model, and views.
 - `XiaoLiao/Features/Conversation/ConversationAudioController.swift`: local microphone, recording review, playback, and temporary audio-file lifecycle.
+- `XiaoLiao/Features/Conversation/ConversationHistoryStore.swift`: local SwiftData history and durable recording-file storage.
 - `XiaoLiao/Design/`: shared colors, background, and artwork controls.
 - `XiaoLiao/Assets.xcassets`: bundled Figma artwork and colors.
 - `XiaoLiaoTests/`, `XiaoLiaoUITests/`: behavior and navigation tests.
@@ -24,13 +25,15 @@ The project uses explicit Xcode groups and file references following a workaroun
 - Only the learner's most recent message may offer Edit; a later partner reply does not remove that eligibility. Hide Edit on older/partner messages and enforce the same policy when beginning and committing edits. Text/fixture-transcript edits use the text composer; real recorded messages use the Figma recording row to record a replacement. Keep the original audio/message until its replacement is successfully committed.
 - Use feature directories; extract shared controls only when actually reused. Avoid speculative repositories, dependency containers, coordinators, and service protocols.
 - Keep data local and deterministic initially. Milestones one and two use in-memory state: no backend, AI API, authentication, network service, API keys, analytics, or disk persistence. Do not imply that canned content is generated or translated live.
-- Milestone three permits real local audio using Apple AVFoundation/AVFAudio. Request microphone permission only when the user starts recording. Store clips in app-owned temporary files referenced by in-memory history; delete cancelled/replaced clips and previous-run scratch files. This does not authorize persisted history, speech recognition, synthesized partner speech, uploads, or backend integration.
+- Milestone three permits real local audio using Apple AVFoundation/AVFAudio. Request microphone permission only when the user starts recording. Unsent recordings use app-owned temporary files. Milestone four A now permits local persisted history: copy committed clips into Application Support before saving conversation metadata. Keep temporary cleanup separate from durable recordings. Speech recognition, synthesized partner speech, uploads, and backend integration remain unauthorized.
+- Use the concrete main-actor `ConversationHistoryStore` and one SwiftData record per session, with a versioned Codable payload. Store only relative recording filenames in payloads so references survive sandbox relocation. Initialize the persistent view model once at app entry; plain view-model initializers and previews stay in memory. Pure persistence values and the SwiftData envelope type are explicitly `nonisolated` under the retained default-main-actor build setting; UI state stays on the main actor.
+- Save starts, committed messages/edits, recordings, and current-session settings immediately. Commit visible changes only after disk save succeeds; keep unsent text/audio available on failure and roll settings back. Do not silently reset a damaged/unsupported store. Reclaim orphaned recording files only after a successful complete history load; replaced durable clips remain until this safe cleanup point. Missing clips must not erase text/settings or simulate playback.
 - Audio UI state belongs to the main-actor observable audio controller, owned by the feature view model. Close recording segments before playback and join PCM buffers off the main actor. Invalidate pending permission/finalization work on cancellation or navigation, and recheck the active session and latest-message edit policy before committing. Stop recording/playback on backgrounding, audio interruptions, loss of the selected audio device, and media-service failures; never restart automatically.
 - Add no third-party dependencies unless necessary. Prefer Apple frameworks. Bundled PDF artwork is a build asset, not a runtime rendering dependency.
 - Use native layout, scrolling, text input, safe areas, and navigation. Preserve custom Figma artwork rather than replacing it with similar SF Symbols. Use SF Symbols only where the design names them.
 - Centralize brand colors. Use semantic text styles or scaled metrics for custom display sizes; provide VoiceOver labels, selection state, and at least 44-point action targets. Respect Reduce Motion. Do not bake a whole screen screenshot into the UI.
 - Add focused tests for consequential state transitions and navigation. Never claim tests passed or compilation succeeded unless the relevant command actually ran successfully.
-- Keep changes scoped to the requested milestone. The current authorized milestone is local audio practice (milestone three); stop when that flow is ready for Xcode/device testing. General settings, conversation adjustment, statistics, persisted history, and backend integration remain future work.
+- Keep changes scoped to the requested milestone. The current authorized milestone is milestone four A: local persisted history only; stop when ready for Xcode/relaunch testing. General settings, conversation adjustment, statistics, cloud sync, authentication, and backend integration remain future work.
 
 ## Design source and constraints
 
@@ -64,7 +67,9 @@ For milestone three the user approved reusing the existing recording row: Pause 
 
 An initial prompt is required: users must type one or tap the prompt suggestion button (a deterministic local fixture for now). The user confirmed that the earlier “optional” wording was a mistake. Retain the coffee/turtle mock mistranslation for now, as explicitly requested.
 
-History entries retain their own committed messages and settings for the current app run. New Conversation clears the draft, selection, and settings to the Figma defaults without altering existing entries. Reopening history clears transient selection/unsent edits and restores that entry. Do not silently add disk persistence or generated history titles; local titles use the turtle fixture label or a short prompt prefix.
+History entries now retain their committed messages, original communication methods, settings, ordering, and recordings across launches on the same installation. Production history begins empty and contains only conversations the user starts; B–J/turtle history rows remain test/preview fixtures. New Conversation clears the draft, selection, and settings to the Figma defaults without altering saved entries. Reopening history clears transient selection/unsent edits and restores that entry. Launch on New Conversation and reopen saved entries through the existing drawer; do not persist navigation, selected actions, unsent topics/messages, or recording drafts. Local titles use the turtle fixture label or a short prompt prefix; do not generate titles or add new history controls/empty-state screens.
+
+Unit persistence tests use temporary directories. Debug UI tests use a unique UUID in `XIAOLIAO_UI_TEST_STORE` to select an isolated Application Support store; relaunch tests reuse that UUID. Never clear or reuse the person's normal history store for automated tests. There are no iCloud entitlements or remote services in milestone four A.
 
 Asset provenance is recorded in `Docs/FIGMA_ASSETS.md`. Never use temporary Figma URLs at runtime. Preserve original image proportions and asset-layer composition.
 

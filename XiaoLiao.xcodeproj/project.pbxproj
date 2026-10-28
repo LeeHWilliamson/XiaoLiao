@@ -31,6 +31,8 @@
 		8DC9748FED1CA15F755682DE /* XiaoLiaoUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 233CBD84CA1955C78AF41FE5 /* XiaoLiaoUITestsLaunchTests.swift */; };
 		0E5756387B134F17F6F6001A /* ConversationAudioController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B2B9C6C66493FF90802FD6A /* ConversationAudioController.swift */; };
 		FD2F7D380A04AE5ADCE9F8B8 /* ConversationAudioTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEC09A9D89FDA0C75F824402 /* ConversationAudioTests.swift */; };
+		634C472D3F4417B15850D16F /* ConversationHistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9DB08A4B0A71D2E9E27DF39 /* ConversationHistoryStore.swift */; };
+		290512C389AAC9AC0F63F284 /* ConversationPersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80003F66A17E898E3C708E71 /* ConversationPersistenceTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -82,6 +84,8 @@
 		3CF4D98A3090438700EBB3F1 /* XiaoLiaoUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = XiaoLiaoUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		8B2B9C6C66493FF90802FD6A /* ConversationAudioController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationAudioController.swift; sourceTree = "<group>"; };
 		EEC09A9D89FDA0C75F824402 /* ConversationAudioTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationAudioTests.swift; sourceTree = "<group>"; };
+		F9DB08A4B0A71D2E9E27DF39 /* ConversationHistoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationHistoryStore.swift; sourceTree = "<group>"; };
+		80003F66A17E898E3C708E71 /* ConversationPersistenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationPersistenceTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -142,6 +146,7 @@
 		E329F95D46805A532206D6A3 /* Conversation */ = {
 			isa = PBXGroup;
 			children = (
+				F9DB08A4B0A71D2E9E27DF39 /* ConversationHistoryStore.swift */,
 				8B2B9C6C66493FF90802FD6A /* ConversationAudioController.swift */,
 				4292123CDC2C6D4EABDA20B3 /* Views */,
 				E35803FF8B2EA81DFD22F86C /* ConversationMessage.swift */,
@@ -168,6 +173,7 @@
 		3CF4D9833090438700EBB3F1 /* XiaoLiaoTests */ = {
 			isa = PBXGroup;
 			children = (
+				80003F66A17E898E3C708E71 /* ConversationPersistenceTests.swift */,
 				EEC09A9D89FDA0C75F824402 /* ConversationAudioTests.swift */,
 				1FD54F76EACD24794366F589 /* ConversationViewModelTests.swift */,
 				9C763B5ECEE8F95A3B023B26 /* XiaoLiaoTests.swift */,
@@ -354,6 +360,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				634C472D3F4417B15850D16F /* ConversationHistoryStore.swift in Sources */,
 				0E5756387B134F17F6F6001A /* ConversationAudioController.swift in Sources */,
 				FBFA0F4C1C46951B674946E4 /* ContentView.swift in Sources */,
 				6616BFE473AB684422612C8D /* ArtworkControls.swift in Sources */,
@@ -377,6 +384,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				290512C389AAC9AC0F63F284 /* ConversationPersistenceTests.swift in Sources */,
 				FD2F7D380A04AE5ADCE9F8B8 /* ConversationAudioTests.swift in Sources */,
 				608FDCB81BC1AFFCF6A5CC37 /* ConversationViewModelTests.swift in Sources */,
 				528894A1113B41878B13F593 /* XiaoLiaoTests.swift in Sources */,
@@ -538,7 +546,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "小聊需要使用麦克风录制你的英语练习语音。录音仅保存在本机，供本次使用期间试听。";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "小聊需要使用麦克风录制你的英语练习语音。录音仅保存在本机，供你在历史对话中试听。";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -570,7 +578,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "小聊需要使用麦克风录制你的英语练习语音。录音仅保存在本机，供本次使用期间试听。";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "小聊需要使用麦克风录制你的英语练习语音。录音仅保存在本机，供你在历史对话中试听。";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

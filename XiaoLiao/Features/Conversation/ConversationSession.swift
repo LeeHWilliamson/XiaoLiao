@@ -1,4 +1,4 @@
-struct ConversationSession: Identifiable, Equatable {
+nonisolated struct ConversationSession: Identifiable, Equatable, Codable {
     let id: String
     let title: String
     let prompt: String

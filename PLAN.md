@@ -155,11 +155,47 @@ Apple API references: [recording](https://developer.apple.com/documentation/avfa
 8. Compare the recording and playback layouts to `2:121`, `2:303`, and `2:432` on large/small iPhones, landscape, Dynamic Type, VoiceOver, and Reduce Motion. Confirm 44-point action targets and accessible duration/play/pause/resume/send labels.
 9. Relaunch and confirm history resets. Recordings are temporary current-run data; persistence is milestone four. Physical-device microphone/output behavior still needs testing even if the simulator works.
 
-Stop after milestone three. Open runtime questions: actual microphone/input routing on the user's cloud Mac, physical-device interruption behavior, and visual/accessibility comparison in Xcode. Speech recognition and live partner audio remain future integration work.
+Milestone-three source work stopped at its boundary. The user subsequently authorized milestone four A while microphone testing remains pending until later. Open runtime questions: actual microphone/input routing on the user's cloud Mac, physical-device interruption behavior, and visual/accessibility comparison in Xcode. Speech recognition and live partner audio remain future integration work.
 
-## Milestone 4 — persisted history and designed statistics (future)
+## Milestone 4 A — local persisted history
 
-Add persistence and the existing conversation/all-time statistics views once metric definitions are confirmed. Acceptance: sessions survive relaunch and local statistics match defined sample calculations; the app and tests build.
+Authorized 2026-10-28: “Just the first part of Milestone 4.” Scope is local history persistence using the existing drawer; statistics and cloud/backend services remain out of scope. No new history screen, deletion/menu/search flow, or generated title is added.
+
+- [x] Add a concrete SwiftData history store with one record per conversation and a versioned Codable payload. Update only the affected record on each save; keep audio bytes in separate files. Read text/settings metadata into the existing in-memory history list and use its existing native scrolling. No arbitrary conversation-count cap is imposed.
+- [x] Persist conversation identity/title/prompt, committed text/fixture transcript/translation content, original sender/send method, and all three settings. Preserve newest-created-first ordering without reordering on settings/edit/reopen. Production starts with an empty history; the old B–J placeholder rows are retained only in unit/preview fixtures.
+- [x] Copy committed recordings into `Application Support/XiaoLiao/Recordings` before writing their message references. Encode relative UUID filenames, resolve against the current installation's directory on load, and validate decoded file references. Temporary recording cleanup cannot remove committed clips.
+- [x] Commit UI changes after successful saves. Failed text saves retain the draft/edit state, failed settings saves revert the selection, and failed audio saves retain the review clip for retry. Keep the previous message and recording on failed replacement. Reclaim superseded/unreferenced durable clips only after a successful complete load; failed/unsupported loads never trigger a reset or cleanup.
+- [x] Restore the saved list on launch while opening New Conversation. Do not persist navigation, selected messages/details, unsent topic/text, draft settings, or unfinished recordings. New Conversation continues to clear only the draft, and reopening an entry clears transient UI.
+- [x] Use native storage-failure alerts with a retry for initialization/read failures. Preserve missing-audio messages/settings and disable their Play action; report unavailable recordings rather than erase history or claim playback works.
+- [x] Initialize persistence once at app entry; inject that shared model into root navigation. Keep normal unit tests and previews in memory, persistence unit tests in temporary directories, and Debug UI tests in separate UUID-named stores. UI relaunch tests reuse the same test store.
+- [x] Add eleven focused persistence tests: empty first launch/transient drafts; full value/settings/send-method restoration; 300 conversations and stable order; audio copying/relative-path relocation; failed text/settings saves; failed audio replacement; missing audio; unsupported payload recovery; invalid clip paths; successful replacement/orphan cleanup; and initialization retry without data reset. Add a UI terminate/relaunch history/settings test and update the existing settings flow to create a second real conversation.
+- [x] Register the two new Swift files once in the app/unit-test targets; retain build/signing/deployment/concurrency settings. Update both microphone usage descriptions to reflect durable local recording history. No third-party dependency, cloud capability, authentication, or AI integration is added.
+- [ ] Build, run unit/UI tests, and perform force-quit/relaunch and audio checks in Xcode/on device.
+
+Data is stored locally in the app's Application Support directory, using `History.store` and separate `Recordings/*.caf` files. This is persistence on the same installation, not a cross-device account or a remote backup feature. Earlier milestones never wrote history to disk, so their already-lost in-memory sessions cannot be migrated. Newly started conversations still use mock partner messages; persistence does not imply live AI.
+
+### Milestone-four A validation
+
+The simulator build command was attempted and failed with `xcodebuild: command not found` (exit 127). No successful compilation, SwiftData execution, unit/UI-test pass, simulator comparison, or microphone test is claimed. The earlier `Timed out waiting for AX loaded notification` UI-runner problem remains unresolved.
+
+Static validation passed: the project parses; all 17 app, five unit-test, and three UI-test Swift sources are registered exactly once in their own targets; the asset catalog remains registered once. Existing build settings are unchanged except for the two updated microphone usage descriptions. `git diff --check` passed. No artwork, third-party dependency, cloud entitlement, statistics implementation, or network service was added.
+
+Xcode/relaunch checklist:
+
+1. Build with the unchanged iOS 26.5 deployment target. Confirm `ConversationHistoryStore.swift` and `ConversationPersistenceTests.swift` appear in Xcode and run the unit suite. Run the UI suite when its runner initializes; the tests must use isolated stores rather than clearing personal history.
+2. On a fresh install, open history: only the existing “新对话” row should appear. Start two conversations with different prompts/settings, send/edit text, switch between entries, and verify independent content and stable ordering.
+3. Force-quit and relaunch. Open history from New Conversation, reopen each saved entry, and verify prompts, edited messages, original voice/text colors, latest-message edit eligibility, and tone/vocabulary/reply-length selections. Unsent text, selected actions, and the previously open route must not return.
+4. When microphone testing is available, record/send audio, relaunch, and play it from history. Record a replacement and cancel: the original must still play. Send a replacement, relaunch again, and verify the updated recording survives with the same message identity. Changing composer modes must not recolor older messages.
+5. Start New Conversation, leave an unsent topic/text/recording, and relaunch. Saved entries must remain, and unfinished input must not be added to history. Merely opening history or changing draft settings must not create a saved conversation.
+6. Check the persistence failure/unsupported-payload/missing-audio tests before considering recovery verified. No error path may delete the store or its referenced clips; failed saves must not appear successful. Check drawer scrolling and launch responsiveness with the 300-conversation fixture; no on-device performance benchmark has run here.
+
+Apple references: [SwiftData persistence](https://developer.apple.com/documentation/swiftdata/preserving-your-apps-model-data-across-launches), [ModelContext save/rollback](https://developer.apple.com/documentation/swiftdata/modelcontext), [Application Support storage](https://developer.apple.com/documentation/foundation/using-the-file-system-effectively).
+
+Stop after local history persistence. No outstanding design choice blocks this implementation; runtime acceptance and the milestone-three microphone checks remain pending.
+
+## Milestone 4 B — designed statistics (future; not authorized)
+
+Implement the existing conversation/all-time statistics views only after metric definitions are confirmed and separately requested. Acceptance: statistics match defined sample calculations and the app/tests build.
 
 ## Milestone 5 — service integration (future; requires a new request)
 

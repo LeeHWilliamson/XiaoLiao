@@ -7,7 +7,7 @@ final class ConversationFlowUITests: XCTestCase {
 
     @MainActor
     func testNavigationAndContextualActions() {
-        let app = XCUIApplication()
+        let app = XCUIApplication.isolatedHistoryApp()
         app.launch()
         let start = app.buttons["conversation.start"]
         XCTAssertTrue(start.waitForExistence(timeout: 5))
@@ -56,7 +56,7 @@ final class ConversationFlowUITests: XCTestCase {
 
     @MainActor
     func testEditingUsesTextComposerAndCanReturnToVoiceMode() {
-        let app = XCUIApplication()
+        let app = XCUIApplication.isolatedHistoryApp()
         app.launch()
         app.buttons["conversation.suggest"].tap()
         app.buttons["conversation.start"].tap()
@@ -74,7 +74,7 @@ final class ConversationFlowUITests: XCTestCase {
 
     @MainActor
     func testSettingsAreRestoredPerHistoryEntry() {
-        let app = XCUIApplication()
+        let app = XCUIApplication.isolatedHistoryApp()
         app.launch()
         app.buttons["conversation.settings"].tap()
         let back = app.buttons["settings.back"]
@@ -95,7 +95,9 @@ final class ConversationFlowUITests: XCTestCase {
         let selected = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND value == %@", "history.session.", "已选择")).firstMatch
         XCTAssertTrue(selected.waitForExistence(timeout: 5))
         let savedID = selected.identifier
-        app.buttons["history.session.history-B"].tap()
+        app.buttons["history.new"].tap()
+        app.buttons["conversation.suggest"].tap()
+        app.buttons["conversation.start"].tap()
 
         app.buttons["conversation.settings"].tap()
         XCTAssertTrue(back.waitForExistence(timeout: 5))
@@ -115,7 +117,7 @@ final class ConversationFlowUITests: XCTestCase {
 
     @MainActor
     func testClosingHistoryPreservesNewConversationPrompt() {
-        let app = XCUIApplication()
+        let app = XCUIApplication.isolatedHistoryApp()
         app.launch()
         app.buttons["conversation.suggest"].tap()
         let prompt = app.textViews["conversation.prompt"]
@@ -127,5 +129,45 @@ final class ConversationFlowUITests: XCTestCase {
         XCTAssertTrue(prompt.waitForExistence(timeout: 5))
         XCTAssertEqual(prompt.value as? String, original)
         XCTAssertTrue(app.buttons["conversation.start"].isEnabled)
+    }
+
+    @MainActor
+    func testHistoryAndSettingsSurviveAppTermination() {
+        let app = XCUIApplication.isolatedHistoryApp()
+        app.launch()
+        app.buttons["conversation.suggest"].tap()
+        app.buttons["conversation.start"].tap()
+        app.buttons["conversation.settings"].tap()
+        let back = app.buttons["settings.back"]
+        XCTAssertTrue(back.waitForExistence(timeout: 5))
+        app.buttons["settings.tone.formal"].tap()
+        app.buttons["settings.replyLength.brief"].tap()
+        back.tap()
+        app.buttons["conversation.history"].tap()
+        let selected = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND value == %@", "history.session.", "已选择")).firstMatch
+        XCTAssertTrue(selected.waitForExistence(timeout: 5))
+        let savedID = selected.identifier
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(app.buttons["conversation.history"].waitForExistence(timeout: 5))
+        app.buttons["conversation.history"].tap()
+        let saved = app.buttons[savedID]
+        XCTAssertTrue(saved.waitForExistence(timeout: 5))
+        saved.tap()
+        XCTAssertTrue(app.buttons["message.mock-learner-text"].waitForExistence(timeout: 5))
+        app.buttons["conversation.settings"].tap()
+        XCTAssertTrue(back.waitForExistence(timeout: 5))
+        XCTAssertEqual(app.buttons["settings.tone.formal"].value as? String, "已选择")
+        XCTAssertEqual(app.buttons["settings.replyLength.brief"].value as? String, "已选择")
+    }
+}
+
+extension XCUIApplication {
+    @MainActor
+    static func isolatedHistoryApp() -> XCUIApplication {
+        let app = XCUIApplication()
+        // A unique durable store for each test; relaunches of this instance reuse it.
+        app.launchEnvironment["XIAOLIAO_UI_TEST_STORE"] = UUID().uuidString
+        return app
     }
 }

@@ -1,15 +1,15 @@
 import Foundation
 
-struct ConversationMessage: Identifiable, Equatable {
-    enum Sender: Equatable {
+nonisolated struct ConversationMessage: Identifiable, Equatable, Codable {
+    enum Sender: String, Equatable, Codable {
         case partner, learner
     }
 
-    enum CommunicationMethod: Equatable {
+    enum CommunicationMethod: String, Equatable, Codable {
         case voice, text
     }
 
-    enum Content: Equatable {
+    enum Content: Equatable, Codable {
         case audio(duration: Int, transcript: String)
         case text(String)
     }

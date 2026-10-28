@@ -3,12 +3,43 @@ import AudioToolbox
 import Foundation
 import Observation
 
-/// A temporary recording owned by a message for the current app run.
-struct LocalAudioClip: Equatable, Sendable {
+/// Drafts use temporary files; committed recordings are copied into Application Support.
+nonisolated struct LocalAudioClip: Equatable, Sendable, Codable {
     let url: URL
     let duration: TimeInterval
 
     var durationLabel: String { "\(max(1, Int(duration.rounded(.up))))秒" }
+
+    static let directoryKey = CodingUserInfoKey(rawValue: "XiaoLiao.recordingsDirectory")!
+    private enum CodingKeys: String, CodingKey { case filename, duration }
+
+    init(url: URL, duration: TimeInterval) {
+        self.url = url
+        self.duration = duration
+    }
+
+    init(from decoder: any Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        let filename = try values.decode(String.self, forKey: .filename)
+        let duration = try values.decode(TimeInterval.self, forKey: .duration)
+        guard filename.hasSuffix(".caf"), UUID(uuidString: String(filename.dropLast(4))) != nil,
+              duration.isFinite, duration > 0, duration < Double(Int.max) / 2,
+              let directory = decoder.userInfo[Self.directoryKey] as? URL else {
+            throw DecodingError.dataCorruptedError(forKey: .filename, in: values, debugDescription: "Invalid local recording reference")
+        }
+        self.url = directory.appendingPathComponent(filename)
+        self.duration = duration
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        guard url.pathExtension == "caf", UUID(uuidString: url.deletingPathExtension().lastPathComponent) != nil,
+              duration.isFinite, duration > 0, duration < Double(Int.max) / 2 else {
+            throw EncodingError.invalidValue(self, .init(codingPath: encoder.codingPath, debugDescription: "Invalid local recording reference"))
+        }
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(url.lastPathComponent, forKey: .filename)
+        try values.encode(duration, forKey: .duration)
+    }
 }
 
 @MainActor
@@ -165,10 +196,14 @@ final class ConversationAudioController: NSObject, AVAudioRecorderDelegate, AVAu
         let request = generation
         if recordingState == .recording { await pauseRecording() }
         guard generation == request, recordingState == .review, let clip = reviewClip else { return nil }
-        // Transfer only the joined clip to the message; cancel removes segment files.
+        return clip
+    }
+
+    /// Release the draft only after the conversation has actually been saved.
+    func completeSend() {
+        guard recordingState == .review else { return }
         reviewClip = nil
         cancelDraft()
-        return clip
     }
 
     func cancelDraft() {

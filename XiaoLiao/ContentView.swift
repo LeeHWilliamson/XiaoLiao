@@ -5,10 +5,14 @@ import Combine
 struct ContentView: View {
     private enum Route: Hashable { case conversation, settings }
     @State private var path: [Route] = []
-    @State private var conversation = ConversationViewModel()
+    @State private var conversation: ConversationViewModel
     @State private var isHistoryPresented = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
+
+    init(viewModel: ConversationViewModel) {
+        _conversation = State(initialValue: viewModel)
+    }
 
     var body: some View {
         ZStack {
@@ -38,6 +42,23 @@ struct ContentView: View {
         }
         // The supplied Figma frames define a light-only brand palette.
         .preferredColorScheme(.light)
+        .alert("本地历史", isPresented: Binding(
+            get: { conversation.storageIssue != nil },
+            set: { if !$0 { conversation.storageIssue = nil } }
+        )) {
+            if conversation.storageIssue?.canRetryLoading == true {
+                Button("重试读取") {
+                    conversation.storageIssue = nil
+                    Task { @MainActor in
+                        await Task.yield()
+                        conversation.retryLoadingHistory()
+                    }
+                }
+            }
+            Button("好", role: .cancel) { conversation.storageIssue = nil }
+        } message: {
+            Text(conversation.storageIssue?.message ?? "")
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .background { conversation.audio.interrupt() }
         }
@@ -117,5 +138,5 @@ struct ContentView: View {
 }
 
 #Preview {
-    ContentView()
+    ContentView(viewModel: ConversationViewModel())
 }
