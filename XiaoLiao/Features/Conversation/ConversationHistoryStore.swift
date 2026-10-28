@@ -51,6 +51,7 @@ final class ConversationHistoryStore {
 
     static var defaultDirectory: URL {
         URL.applicationSupportDirectory.appendingPathComponent("XiaoLiao", isDirectory: true)
+            .appendingPathComponent("ConversationData-v2", isDirectory: true)
     }
 
     func load() throws -> [ConversationSession] {
@@ -70,23 +71,29 @@ final class ConversationHistoryStore {
 
     /// Copy new clips first, then commit metadata. A failed save leaves the old
     /// conversation/audio intact; a crash can at worst leave an unreferenced clip.
-    func save(_ session: ConversationSession) throws -> ConversationSession {
+    func save(_ session: ConversationSession, recordingSources: [String: URL] = [:]) throws -> ConversationSession {
         guard allowsSave else { throw CocoaError(.fileWriteNoPermission) }
         guard hasLoaded, !session.id.isEmpty,
               Set(session.messages.map(\.id)).count == session.messages.count else { throw StoreError.invalidSession }
+        try session.validate()
         var saved = session
         var copiedFiles: [URL] = []
         do {
+            var promotedKeys: [String: String] = [:]
             for index in saved.messages.indices {
-                guard let clip = saved.messages[index].localAudio else { continue }
-                guard clip.duration.isFinite, clip.duration > 0 else { throw StoreError.invalidSession }
-                if owns(clip) { continue }
-                let target = recordingsDirectory.appendingPathComponent(UUID().uuidString + ".caf")
-                copiedFiles.append(target)
-                try FileManager.default.copyItem(at: clip.url, to: target)
-                saved.messages[index].localAudio = LocalAudioClip(url: target, duration: clip.duration)
+                guard let attachment = saved.messages[index].audioAttachment else { continue }
+                let key = attachment.storageKey
+                if let promoted = promotedKeys[key] {
+                    saved.messages[index] = saved.messages[index].relocatingAudio(to: promoted)
+                } else if let source = recordingSources[key] {
+                    let target = recordingsDirectory.appendingPathComponent(UUID().uuidString + ".caf")
+                    copiedFiles.append(target)
+                    try FileManager.default.copyItem(at: source, to: target)
+                    promotedKeys[key] = target.lastPathComponent
+                    saved.messages[index] = saved.messages[index].relocatingAudio(to: target.lastPathComponent)
+                }
             }
-            let payload = try JSONEncoder().encode(Payload(version: 1, session: saved))
+            let payload = try JSONEncoder().encode(Payload(version: 2, session: saved))
             let id = session.id
             var request = FetchDescriptor<StoredConversation>(predicate: #Predicate { $0.id == id })
             request.fetchLimit = 1
@@ -107,23 +114,22 @@ final class ConversationHistoryStore {
         }
     }
 
-    func owns(_ clip: LocalAudioClip) -> Bool {
-        clip.url.standardizedFileURL.deletingLastPathComponent() == recordingsDirectory.standardizedFileURL
+    func recordingURL(for storageKey: String) -> URL? {
+        guard ConversationSession.isRecordingKey(storageKey) else { return nil }
+        return recordingsDirectory.appendingPathComponent(storageKey)
     }
 
     private func decode(_ data: Data) throws -> ConversationSession {
         let decoder = JSONDecoder()
-        decoder.userInfo[LocalAudioClip.directoryKey] = recordingsDirectory
         let payload = try decoder.decode(Payload.self, from: data)
-        guard payload.version == 1 else { throw StoreError.unsupportedVersion }
+        guard payload.version == 2 else { throw StoreError.unsupportedVersion }
         let session = payload.session
-        guard !session.id.isEmpty,
-              Set(session.messages.map(\.id)).count == session.messages.count else { throw StoreError.invalidSession }
+        try session.validate()
         return session
     }
 
     private func removeOrphanedRecordings(referencedBy sessions: [ConversationSession]) {
-        let referenced = Set(sessions.flatMap(\.messages).compactMap { $0.localAudio?.url.lastPathComponent })
+        let referenced = Set(sessions.flatMap(\.messages).compactMap { $0.audioAttachment?.storageKey })
         guard let files = try? FileManager.default.contentsOfDirectory(at: recordingsDirectory, includingPropertiesForKeys: nil) else { return }
         for url in files where url.pathExtension == "caf" && !referenced.contains(url.lastPathComponent) {
             try? FileManager.default.removeItem(at: url)

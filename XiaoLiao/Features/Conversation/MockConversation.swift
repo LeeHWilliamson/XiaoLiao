@@ -1,3 +1,5 @@
+import Foundation
+
 enum MockConversation {
     static let systemRequest = "你能用更简单的词吗？"
     static let systemReply = "是的，我们现在可以用更简单的词。\n（本地示例）"
@@ -21,7 +23,7 @@ enum MockConversation {
                 id: index == 0 ? "history-turtles" : "history-\(title)",
                 title: title,
                 prompt: prompt,
-                messages: messages,
+                messages: messages(conversationID: index == 0 ? "history-turtles" : "history-\(title)"),
                 settings: ConversationSettings()
             )
         }
@@ -29,21 +31,27 @@ enum MockConversation {
 
     static let prompt = "我想和一位热情的生物学家聊聊革龟的生命周期。用简单的词语，问一些引导性的问题。"
 
-    static let messages: [ConversationMessage] = [
-        ConversationMessage(
-            id: "mock-partner-audio",
-            sender: .partner,
-            communicationMethod: .voice,
-            content: .audio(duration: 5, transcript: "Do you love turtles?"),
-            mockTranslation: "我今天喝了杯咖啡"
-        ),
-        ConversationMessage(
-            id: "mock-learner-text",
-            sender: .learner,
-            // The green Figma bubble displays the learner's spoken response as text.
-            communicationMethod: .voice,
-            content: .text("Yes, I also love turtles!"),
-            mockTranslation: "我今天喝了杯咖啡"
-        )
-    ]
+    static let partnerAudioKey = "fixture:turtle-partner"
+    static let fixtureDate = Date(timeIntervalSince1970: 1_700_000_000)
+
+    static func messages(conversationID: String, createdAt: Date? = nil) -> [Message] {
+        let timestamp = createdAt ?? fixtureDate
+        let partnerID = conversationID + ".partner-audio"
+        return [
+            Message(id: partnerID, conversationID: conversationID, createdAt: timestamp,
+                    senderRole: .aiPartner, modality: .spoken,
+                    content: .audio(.init(storageKey: partnerAudioKey, durationSeconds: 5)),
+                    transcription: .init(text: "Do you love turtles?", confidence: nil)),
+            Message(id: conversationID + ".learner-text", conversationID: conversationID,
+                    createdAt: timestamp.addingTimeInterval(0.001), senderRole: .user, modality: .spoken,
+                    content: .text("Yes, I also love turtles!"), replyToMessageID: partnerID,
+                    transcription: .init(text: "Yes, I also love turtles!", confidence: nil))
+        ]
+    }
+
+    static func translation(for message: Message) -> String? {
+        guard !message.isEdit, message.purpose == .conversationPractice,
+              message.id.hasSuffix(".partner-audio") || message.id.hasSuffix(".learner-text") else { return nil }
+        return "我今天喝了杯咖啡"
+    }
 }

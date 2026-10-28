@@ -26,9 +26,9 @@ struct ConversationFeedView: View {
                 ScrollViewReader { proxy in
                     ScrollView {
                         VStack(spacing: 40) {
-                            ForEach(viewModel.messages) { message in
+                            ForEach(viewModel.messages, id: \.logicalMessageID) { message in
                                 MessageRow(viewModel: viewModel, message: message)
-                                    .id(message.id)
+                                    .id(message.logicalMessageID)
                             }
                         }
                         .padding(.top, 8)
@@ -48,7 +48,7 @@ struct ConversationFeedView: View {
                     }
                     .scrollDismissesKeyboard(.interactively)
                     .onChange(of: viewModel.messages.count) { _, _ in
-                        if let id = viewModel.messages.last?.id {
+                        if let id = viewModel.messages.last?.logicalMessageID {
                             proxy.scrollTo(id, anchor: .bottom)
                         }
                     }

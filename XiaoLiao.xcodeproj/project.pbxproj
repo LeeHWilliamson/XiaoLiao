@@ -17,7 +17,7 @@
 		6616BFE473AB684422612C8D /* ArtworkControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = D382F5CCF2097A77FAB5D54B /* ArtworkControls.swift */; };
 		013554A311D3F02E2E8AD236 /* FigmaArtwork.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCF551D6462839D4227EFAF3 /* FigmaArtwork.swift */; };
 		583860D69D3FA072F8F4622A /* XiaoLiaoTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E06E7D280A0D31F527F5221 /* XiaoLiaoTheme.swift */; };
-		24EE6BF05565EAED2CE53FD4 /* ConversationMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = E35803FF8B2EA81DFD22F86C /* ConversationMessage.swift */; };
+		24EE6BF05565EAED2CE53FD4 /* MessageAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = E35803FF8B2EA81DFD22F86C /* MessageAction.swift */; };
 		90C4A65BE430C6354E516A02 /* ConversationViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15DAF8F9472318FFEA46A8F9 /* ConversationViewModel.swift */; };
 		B407E0A321050938766704E5 /* MockConversation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5730F3FA603CD5C3B2FCDAAA /* MockConversation.swift */; };
 		C7AF37CF077EC0A4F634638B /* ConversationFeedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66DEB44CD525007373E3460C /* ConversationFeedView.swift */; };
@@ -33,6 +33,10 @@
 		FD2F7D380A04AE5ADCE9F8B8 /* ConversationAudioTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEC09A9D89FDA0C75F824402 /* ConversationAudioTests.swift */; };
 		634C472D3F4417B15850D16F /* ConversationHistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9DB08A4B0A71D2E9E27DF39 /* ConversationHistoryStore.swift */; };
 		290512C389AAC9AC0F63F284 /* ConversationPersistenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80003F66A17E898E3C708E71 /* ConversationPersistenceTests.swift */; };
+		C6CBB761E40F18796E468718 /* Message.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC11472CC510E696A3A3CF7A /* Message.swift */; };
+		42022656D539423D087782A3 /* ObservationMetadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = 195E33336173594DC363EC51 /* ObservationMetadata.swift */; };
+		CAB0FC94FAA7F2088E4145F3 /* GrammarObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D2FEEAD8784AC09BF0CD47A /* GrammarObservation.swift */; };
+		057312DDF7B11AD4C7AA7861 /* VocabularyObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D49C50C814F9CC12F4B7F11 /* VocabularyObservation.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -63,7 +67,7 @@
 		D382F5CCF2097A77FAB5D54B /* ArtworkControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkControls.swift; sourceTree = "<group>"; };
 		FCF551D6462839D4227EFAF3 /* FigmaArtwork.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FigmaArtwork.swift; sourceTree = "<group>"; };
 		3E06E7D280A0D31F527F5221 /* XiaoLiaoTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XiaoLiaoTheme.swift; sourceTree = "<group>"; };
-		E35803FF8B2EA81DFD22F86C /* ConversationMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationMessage.swift; sourceTree = "<group>"; };
+		E35803FF8B2EA81DFD22F86C /* MessageAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageAction.swift; sourceTree = "<group>"; };
 		15DAF8F9472318FFEA46A8F9 /* ConversationViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationViewModel.swift; sourceTree = "<group>"; };
 		5730F3FA603CD5C3B2FCDAAA /* MockConversation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockConversation.swift; sourceTree = "<group>"; };
 		66DEB44CD525007373E3460C /* ConversationFeedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationFeedView.swift; sourceTree = "<group>"; };
@@ -86,6 +90,10 @@
 		EEC09A9D89FDA0C75F824402 /* ConversationAudioTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationAudioTests.swift; sourceTree = "<group>"; };
 		F9DB08A4B0A71D2E9E27DF39 /* ConversationHistoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationHistoryStore.swift; sourceTree = "<group>"; };
 		80003F66A17E898E3C708E71 /* ConversationPersistenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationPersistenceTests.swift; sourceTree = "<group>"; };
+		CC11472CC510E696A3A3CF7A /* Message.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Message.swift; sourceTree = "<group>"; };
+		195E33336173594DC363EC51 /* ObservationMetadata.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObservationMetadata.swift; sourceTree = "<group>"; };
+		9D2FEEAD8784AC09BF0CD47A /* GrammarObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GrammarObservation.swift; sourceTree = "<group>"; };
+		1D49C50C814F9CC12F4B7F11 /* VocabularyObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VocabularyObservation.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -116,6 +124,7 @@
 		3CF4D9753090438400EBB3F1 /* XiaoLiao */ = {
 			isa = PBXGroup;
 			children = (
+				32F12A85B968B2F852F30EE1 /* Models */,
 				774F043D1272581DB05AC54C /* Design */,
 				C8DDD855B6A39072A1326ABE /* Features */,
 				4A200E41D93550D818E573F7 /* Assets.xcassets */,
@@ -149,7 +158,7 @@
 				F9DB08A4B0A71D2E9E27DF39 /* ConversationHistoryStore.swift */,
 				8B2B9C6C66493FF90802FD6A /* ConversationAudioController.swift */,
 				4292123CDC2C6D4EABDA20B3 /* Views */,
-				E35803FF8B2EA81DFD22F86C /* ConversationMessage.swift */,
+				E35803FF8B2EA81DFD22F86C /* MessageAction.swift */,
 				15DAF8F9472318FFEA46A8F9 /* ConversationViewModel.swift */,
 				5730F3FA603CD5C3B2FCDAAA /* MockConversation.swift */,
 				B3CFBEBB6033596BC36F34D7 /* ConversationSession.swift */,
@@ -222,6 +231,17 @@
 				3CF4D98A3090438700EBB3F1 /* XiaoLiaoUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		32F12A85B968B2F852F30EE1 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				CC11472CC510E696A3A3CF7A /* Message.swift */,
+				195E33336173594DC363EC51 /* ObservationMetadata.swift */,
+				9D2FEEAD8784AC09BF0CD47A /* GrammarObservation.swift */,
+				1D49C50C814F9CC12F4B7F11 /* VocabularyObservation.swift */,
+			);
+			path = Models;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -360,13 +380,17 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				057312DDF7B11AD4C7AA7861 /* VocabularyObservation.swift in Sources */,
+				CAB0FC94FAA7F2088E4145F3 /* GrammarObservation.swift in Sources */,
+				42022656D539423D087782A3 /* ObservationMetadata.swift in Sources */,
+				C6CBB761E40F18796E468718 /* Message.swift in Sources */,
 				634C472D3F4417B15850D16F /* ConversationHistoryStore.swift in Sources */,
 				0E5756387B134F17F6F6001A /* ConversationAudioController.swift in Sources */,
 				FBFA0F4C1C46951B674946E4 /* ContentView.swift in Sources */,
 				6616BFE473AB684422612C8D /* ArtworkControls.swift in Sources */,
 				013554A311D3F02E2E8AD236 /* FigmaArtwork.swift in Sources */,
 				583860D69D3FA072F8F4622A /* XiaoLiaoTheme.swift in Sources */,
-				24EE6BF05565EAED2CE53FD4 /* ConversationMessage.swift in Sources */,
+				24EE6BF05565EAED2CE53FD4 /* MessageAction.swift in Sources */,
 				90C4A65BE430C6354E516A02 /* ConversationViewModel.swift in Sources */,
 				B407E0A321050938766704E5 /* MockConversation.swift in Sources */,
 				C7AF37CF077EC0A4F634638B /* ConversationFeedView.swift in Sources */,

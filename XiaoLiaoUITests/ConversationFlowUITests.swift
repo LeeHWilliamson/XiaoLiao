@@ -6,6 +6,12 @@ final class ConversationFlowUITests: XCTestCase {
     }
 
     @MainActor
+    private func fixtureBubble(_ suffix: String, in app: XCUIApplication) -> XCUIElement {
+        app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND identifier ENDSWITH %@",
+                                         "message.", "." + suffix)).firstMatch
+    }
+
+    @MainActor
     func testNavigationAndContextualActions() {
         let app = XCUIApplication.isolatedHistoryApp()
         app.launch()
@@ -16,12 +22,14 @@ final class ConversationFlowUITests: XCTestCase {
         XCTAssertTrue(start.isEnabled)
         start.tap()
 
-        let audio = app.buttons["message.mock-partner-audio"]
-        let learner = app.buttons["message.mock-learner-text"]
-        let learnerTranslation = app.buttons["action.mock-learner-text.translate"]
-        let transcript = app.buttons["action.mock-partner-audio.transcribe"]
+        let audio = fixtureBubble("partner-audio", in: app)
+        let learner = fixtureBubble("learner-text", in: app)
         XCTAssertTrue(audio.waitForExistence(timeout: 5))
         XCTAssertTrue(learner.exists)
+        let learnerID = String(learner.identifier.dropFirst("message.".count))
+        let audioID = String(audio.identifier.dropFirst("message.".count))
+        let learnerTranslation = app.buttons["action.\(learnerID).translate"]
+        let transcript = app.buttons["action.\(audioID).transcribe"]
         XCTAssertTrue(app.buttons["conversation.record"].isEnabled)
         XCTAssertFalse(app.buttons["conversation.pauseRecording"].exists)
         XCTAssertFalse(app.buttons["conversation.sendRecording"].exists)
@@ -29,7 +37,7 @@ final class ConversationFlowUITests: XCTestCase {
         XCTAssertFalse(transcript.exists)
         learner.tap()
         XCTAssertTrue(learnerTranslation.exists)
-        XCTAssertFalse(app.buttons["action.mock-learner-text.play"].isEnabled)
+        XCTAssertFalse(app.buttons["action.\(learnerID).play"].isEnabled)
         learnerTranslation.tap()
         XCTAssertTrue(app.staticTexts["我今天喝了杯咖啡"].exists)
         audio.tap()
@@ -50,7 +58,7 @@ final class ConversationFlowUITests: XCTestCase {
         XCTAssertTrue(start.isEnabled)
         start.tap()
         XCTAssertTrue(audio.waitForExistence(timeout: 5))
-        XCTAssertFalse(transcript.exists)
+        XCTAssertFalse(app.buttons.matching(NSPredicate(format: "identifier ENDSWITH %@", ".transcribe")).firstMatch.exists)
         XCTAssertFalse(app.staticTexts["Do you love turtles?"].exists)
     }
 
@@ -60,10 +68,11 @@ final class ConversationFlowUITests: XCTestCase {
         app.launch()
         app.buttons["conversation.suggest"].tap()
         app.buttons["conversation.start"].tap()
-        let learner = app.buttons["message.mock-learner-text"]
+        let learner = fixtureBubble("learner-text", in: app)
         XCTAssertTrue(learner.waitForExistence(timeout: 5))
+        let learnerID = String(learner.identifier.dropFirst("message.".count))
         learner.tap()
-        app.buttons["action.mock-learner-text.edit"].tap()
+        app.buttons["action.\(learnerID).edit"].tap()
         let draft = app.descendants(matching: .any)["conversation.draft"].firstMatch
         XCTAssertTrue(draft.waitForExistence(timeout: 5))
         XCTAssertEqual(draft.value as? String, "Yes, I also love turtles!")
@@ -154,7 +163,7 @@ final class ConversationFlowUITests: XCTestCase {
         let saved = app.buttons[savedID]
         XCTAssertTrue(saved.waitForExistence(timeout: 5))
         saved.tap()
-        XCTAssertTrue(app.buttons["message.mock-learner-text"].waitForExistence(timeout: 5))
+        XCTAssertTrue(fixtureBubble("learner-text", in: app).waitForExistence(timeout: 5))
         app.buttons["conversation.settings"].tap()
         XCTAssertTrue(back.waitForExistence(timeout: 5))
         XCTAssertEqual(app.buttons["settings.tone.formal"].value as? String, "已选择")

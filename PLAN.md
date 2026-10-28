@@ -212,6 +212,48 @@ Static checks passed for the three color assets' JSON/exact hex values, shared a
 
 Manual check: open a conversation, tap the bottom-left control, verify the blue composer/disabled microphone, type “你能用更简单的词吗？” and send using the keyboard. Confirm a light-blue request and dark-blue local-demo reply, normal composer restoration, and Simple vocabulary in conversation settings. Repeat with “当前对话设置是什么？” and arbitrary text. Reopen through history and relaunch to confirm both message types retain their appearance. Check small iPhones, keyboard avoidance, Dynamic Type, VoiceOver labels, and that previous practice messages keep their original colors. Do not treat the local demonstration as live AI understanding or changed generated partner speech.
 
+## Follow-up — standalone data model definitions
+
+Historical scope; superseded by the app-integration follow-up below.
+
+Authorized scope: create message, grammar observation, and vocabulary observation models only. No app adoption, evaluator, statistics calculation, storage schema change, migration, or UI change.
+
+- [x] Add `Models/Message.swift`: sender role, practice/system purpose, original modality, typed text/audio content, audio storage key/duration, optional transcription/confidence, timestamp, reply linkage, revision, and optional status.
+- [x] Follow-up: define edits as separate immutable Message versions with unique record IDs/timestamps, a shared `logicalMessageID`, optional immediate `replacesMessageID`, increasing revision, and derived `isEdit`. Document that replies/observations refer to exact versions. Leave all running-app edit behavior and statistics policy unchanged.
+- [x] Add `Models/GrammarObservation.swift`: shared metadata and applicable per-rule opportunities with category/subcategory codes, UTF-16 spans, outcomes, optional corrections/explanations/confidence. Derived counts are not duplicated in the model.
+- [x] Add `Models/VocabularyObservation.swift`: shared metadata and word/phrase occurrences with surface text, optional lemma, spans, and grouped category assessments. This is not a complete token inventory or a separate record for every metric/word pair.
+- [x] Add supporting `Models/ObservationMetadata.swift`: observation/message/conversation identity, source revision/text source, evaluation time, provenance, stable category codes, and explicit text-span units.
+- [x] Register definitions under an explicit Models group and app Sources so they are visible/checkable in Xcode, without any runtime callsites. Existing conversation models/view model/store/views, fixtures, and tests are unchanged.
+- [ ] Build the definitions in Xcode. No evaluator output, computed metric, or model persistence is claimed by this definitions-only task.
+
+The existing ConversationMessage remains the running app's model. The proposed grammar/vocabulary containers represent one message-level evaluation each; no observation means not evaluated, while empty arrays mean no applicable entries were found. Applicable uncertain outcomes must be distinguished from errors in future statistics. Future consumers must validate IDs/revisions, ranges against the exact source text, positive revision numbers, nonnegative durations, and confidence values in 0...1; these declarations do not implement that processing. Topic-specific relevance remains a future context-dependent analysis.
+
+Validation: project parsing/source-registration checks and `git diff --check` passed. All 21 app, five unit-test, and three UI-test Swift files are registered once; existing target/resource/build settings and running app/test source files are unchanged. The build attempt failed with `xcodebuild: command not found` (exit 127), so compilation remains unverified. No behavior tests were added for these declaration-only types.
+
+## Follow-up — adopt canonical models in the app
+
+Authorized: integrate the approved Message, GrammarObservation, and VocabularyObservation models into the actual conversation system. Keep the existing Figma UI, local fixtures, and audio interactions. No evaluator, metric calculation, backend, or statistics screen is added.
+
+- [x] Replace ConversationMessage with canonical Message across fixtures, view-model state, actions, feed rendering, and persistence. New records include conversation identity, timestamps, sender/purpose, original modality, content, status, and exact-version reply links. Move contextual action definitions to MessageAction.swift.
+- [x] Append immutable text/audio edit records with unique IDs/timestamps, shared logicalMessageID, immediate replacesMessageID, and incrementing revision. Retain every version; project only the latest version into its original feed position. Keep latest-user edit policy and original modality colors. Replies keep their original exact-version references.
+- [x] Store grammar/vocabulary observations in each ConversationSession and restore them with history. Add validated record methods that replace only the evaluation of the same exact message version/type. Original-version observations survive edits; replacement versions start unevaluated. Do not run or simulate analysis automatically.
+- [x] Validate session/message identity, linear edit chains, reply targets, evaluation eligibility/source/revision, confidence values, UTF-16 spans, and vocabulary surface text before commits. Invalid/failed writes leave existing state intact. Empty evaluated results remain distinct from no evaluation.
+- [x] Persist canonical payload version 2 and relative audio keys. Resolve playback through durable or temporary storage. Retain recordings referenced by all historical versions, including replaced audio. Keep local audio-operation values separate from persisted Message.
+- [x] Use Application Support/XiaoLiao/ConversationData-v2 for the new prototype store. Existing prototype history remains untouched in its previous directory and is not loaded or migrated, following the earlier compatibility waiver. No migration/reset UI is added.
+- [x] Update focused state, audio, persistence, and UI-test sources for canonical IDs, immutable edits, stable feed rows, historical audio, exact-version observations/re-evaluation, Unicode/source validation, save failures, and relaunch. Tests use isolated temporary stores; they do not request real microphone permission.
+- [x] Update explicit Xcode file references for MessageAction.swift, preserve Models source registration, and retain all existing build/signing/deployment/concurrency settings.
+- [ ] Compile and run unit/UI tests in Xcode. Microphone/device acceptance remains pending.
+
+Validation: the simulator build was attempted and failed with `xcodebuild: command not found` (exit 127). No compilation, executed test pass, SwiftData runtime result, or simulator rendering is claimed. Static checks passed: the project parses, all referenced files exist, and all 21 app/five unit-test/three UI-test Swift sources are registered exactly once in their targets. Build configurations and resource phases match both HEAD and the pre-integration project; `git diff --check` passed. No artwork, dependency, entitlement, or network service changed.
+
+Xcode acceptance:
+
+1. Build and run XiaoLiaoTests. The new store starts with an empty drawer; create conversations for this format. Earlier prototype history remains on disk but is not shown.
+2. Edit the latest learner message more than once. Confirm a single visible row stays in position, retains its spoken/written color, and reopens with the newest text. Only the latest learner message may be edited, including after a partner reply; a newer blue system request removes older practice-message edit eligibility.
+3. Send typed/system messages, change settings, switch history entries, and relaunch. Confirm exact content, local system replies/settings, colors, and ordering survive. Unsent input and selection must clear as before.
+4. When microphone testing is possible, record/send, re-record the latest audio, cancel/retry, relaunch, and play the latest recording. Both immutable version references/files must remain stored. Confirm failed saves retain the unsent replacement and original audio.
+5. Observation integration currently has no user-facing control. Use the unit cases for source/revision/span validation, original-versus-edit result retention, re-evaluation, relaunch, and failed writes. Do not expect automatic grammar/vocabulary feedback or statistics yet.
+
 ## Milestone 4 B — designed statistics (future; not authorized)
 
 Implement the existing conversation/all-time statistics views only after metric definitions are confirmed and separately requested. Acceptance: statistics match defined sample calculations and the app/tests build.

@@ -4,42 +4,10 @@ import Foundation
 import Observation
 
 /// Drafts use temporary files; committed recordings are copied into Application Support.
-nonisolated struct LocalAudioClip: Equatable, Sendable, Codable {
+nonisolated struct LocalAudioClip: Equatable, Sendable {
     let url: URL
     let duration: TimeInterval
-
     var durationLabel: String { "\(max(1, Int(duration.rounded(.up))))秒" }
-
-    static let directoryKey = CodingUserInfoKey(rawValue: "XiaoLiao.recordingsDirectory")!
-    private enum CodingKeys: String, CodingKey { case filename, duration }
-
-    init(url: URL, duration: TimeInterval) {
-        self.url = url
-        self.duration = duration
-    }
-
-    init(from decoder: any Decoder) throws {
-        let values = try decoder.container(keyedBy: CodingKeys.self)
-        let filename = try values.decode(String.self, forKey: .filename)
-        let duration = try values.decode(TimeInterval.self, forKey: .duration)
-        guard filename.hasSuffix(".caf"), UUID(uuidString: String(filename.dropLast(4))) != nil,
-              duration.isFinite, duration > 0, duration < Double(Int.max) / 2,
-              let directory = decoder.userInfo[Self.directoryKey] as? URL else {
-            throw DecodingError.dataCorruptedError(forKey: .filename, in: values, debugDescription: "Invalid local recording reference")
-        }
-        self.url = directory.appendingPathComponent(filename)
-        self.duration = duration
-    }
-
-    func encode(to encoder: any Encoder) throws {
-        guard url.pathExtension == "caf", UUID(uuidString: url.deletingPathExtension().lastPathComponent) != nil,
-              duration.isFinite, duration > 0, duration < Double(Int.max) / 2 else {
-            throw EncodingError.invalidValue(self, .init(codingPath: encoder.codingPath, debugDescription: "Invalid local recording reference"))
-        }
-        var values = encoder.container(keyedBy: CodingKeys.self)
-        try values.encode(url.lastPathComponent, forKey: .filename)
-        try values.encode(duration, forKey: .duration)
-    }
 }
 
 @MainActor
@@ -75,7 +43,7 @@ final class ConversationAudioController: NSObject, AVAudioRecorderDelegate, AVAu
     @ObservationIgnored private let directory: URL
     @ObservationIgnored private let permissionRequest: @MainActor () async -> Bool
 
-    // No history is persisted. Clear this app's previous-run scratch files once per launch.
+    // Durable history uses Application Support; clear only previous-run scratch files.
     private static let runDirectory: URL = {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("XiaoLiaoRecordings", isDirectory: true)
         try? FileManager.default.removeItem(at: root)

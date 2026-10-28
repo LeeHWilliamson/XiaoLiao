@@ -77,34 +77,40 @@ final class ConversationAudioTests: XCTestCase {
     }
 
     @MainActor
-    func testEmptyAudioCannotBecomeASentMessage() throws {
+    func testInvalidAndStaleRecordingCannotBeCommitted() throws {
         let directory = try makeDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
-        XCTAssertThrowsError(try ConversationAudioController.joinSegments([], to: directory.appendingPathComponent("empty.caf")))
         let model = makeConversation()
         let id = try XCTUnwrap(model.activeSessionID)
+        let original = model.messageVersions
         let missing = LocalAudioClip(url: directory.appendingPathComponent("missing.caf"), duration: 1)
         XCTAssertFalse(model.commitRecording(missing, in: id))
         let clip = try makeClip(in: directory)
         XCTAssertFalse(model.commitRecording(LocalAudioClip(url: clip.url, duration: 0), in: id))
         XCTAssertFalse(model.commitRecording(LocalAudioClip(url: clip.url, duration: .nan), in: id))
-        XCTAssertEqual(model.messages, MockConversation.messages)
+        model.prepareNewConversation()
+        model.suggestPrompt()
+        XCTAssertTrue(model.startConversation())
+        XCTAssertFalse(model.commitRecording(clip, in: id))
+        XCTAssertEqual(model.messages.count, 2)
+        XCTAssertEqual(model.history.first(where: { $0.id == id })?.messages, original)
     }
 
     @MainActor
-    func testRecordedMessageRetainsAudioAndVoiceAppearanceAcrossHistory() throws {
+    func testRecordingMetadataAndPlaybackReferenceSurviveHistorySwitches() throws {
         let directory = try makeDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = makeConversation()
-        let sessionID = try XCTUnwrap(model.activeSessionID)
+        let id = try XCTUnwrap(model.activeSessionID)
         let clip = try makeClip(in: directory)
-        XCTAssertTrue(model.commitRecording(clip, in: sessionID))
+        XCTAssertTrue(model.commitRecording(clip, in: id))
         let sent = try XCTUnwrap(model.messages.last)
-        XCTAssertEqual(sent.sender, .learner)
-        XCTAssertEqual(sent.communicationMethod, .voice)
-        XCTAssertEqual(sent.localAudio, clip)
-        XCTAssertEqual(sent.content, .text("语音消息 · 1秒"))
-        XCTAssertNil(sent.mockTranslation)
+        XCTAssertEqual(sent.senderRole, .user)
+        XCTAssertEqual(sent.modality, .spoken)
+        XCTAssertEqual(sent.audioAttachment?.durationSeconds, clip.duration)
+        XCTAssertEqual(sent.audioAttachment?.storageKey, clip.url.lastPathComponent)
+        XCTAssertNil(sent.transcription)
+        XCTAssertEqual(model.audioClip(for: sent), clip)
         XCTAssertTrue(model.isAvailable(.play, for: sent))
         XCTAssertFalse(model.isAvailable(.translate, for: sent))
         model.showTextInput()
@@ -112,80 +118,47 @@ final class ConversationAudioTests: XCTestCase {
         XCTAssertTrue(model.submitDraft())
         XCTAssertFalse(model.actions(for: sent).contains(.edit))
         model.prepareNewConversation()
-        XCTAssertTrue(FileManager.default.fileExists(atPath: clip.url.path))
-        XCTAssertTrue(model.openConversation(sessionID))
+        XCTAssertTrue(model.openConversation(id))
         XCTAssertEqual(model.messages[2], sent)
-        XCTAssertEqual(model.messages.last?.communicationMethod, .text)
+        XCTAssertEqual(model.audioClip(for: sent), clip)
+        XCTAssertEqual(model.messages.last?.modality, .written)
     }
 
     @MainActor
-    func testFinalizedClipCannotBeCommittedIntoAnotherConversation() throws {
+    func testAudioEditKeepsOriginalFileAndAppendsReplacementVersion() throws {
         let directory = try makeDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let model = makeConversation()
-        let originalID = try XCTUnwrap(model.activeSessionID)
-        let clip = try makeClip(in: directory)
-        model.prepareNewConversation()
-        model.suggestPrompt()
-        XCTAssertTrue(model.startConversation())
-        XCTAssertFalse(model.commitRecording(clip, in: originalID))
-        XCTAssertEqual(model.messages, MockConversation.messages)
-        XCTAssertEqual(model.history.first(where: { $0.id == originalID })?.messages, MockConversation.messages)
-    }
-
-    @MainActor
-    func testAudioReplacementIsAtomicAndCancelKeepsOriginal() throws {
-        let directory = try makeDirectory()
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let model = makeConversation()
-        let sessionID = try XCTUnwrap(model.activeSessionID)
-        let original = try makeClip(in: directory)
-        XCTAssertTrue(model.commitRecording(original, in: sessionID))
-        let message = try XCTUnwrap(model.messages.last)
-        model.selectMessage(message.id)
-        model.perform(.edit, on: message.id)
+        let id = try XCTUnwrap(model.activeSessionID)
+        let originalClip = try makeClip(in: directory)
+        XCTAssertTrue(model.commitRecording(originalClip, in: id))
+        let original = try XCTUnwrap(model.messages.last)
+        model.selectMessage(original.id)
+        model.perform(.edit, on: original.id)
         model.cancelAudioDraft()
-        XCTAssertEqual(model.messages.last, message)
-        XCTAssertTrue(FileManager.default.fileExists(atPath: original.url.path))
-
+        XCTAssertEqual(model.messages.last, original)
         let replacement = try makeClip(in: directory, value: 0.5)
-        XCTAssertFalse(model.commitRecording(replacement, in: sessionID, replacing: message.id))
+        XCTAssertFalse(model.commitRecording(replacement, in: id, replacing: original.id))
         model.deselectMessage()
-        model.selectMessage(message.id)
-        model.perform(.edit, on: message.id)
-        // Stop the injected permission task; commit represents a finalized replacement.
+        model.selectMessage(original.id)
+        model.perform(.edit, on: original.id)
         model.audio.cancelDraft()
-        XCTAssertTrue(model.commitRecording(replacement, in: sessionID, replacing: message.id))
+        XCTAssertTrue(model.commitRecording(replacement, in: id, replacing: original.id))
+        let edited = try XCTUnwrap(model.messages.last)
         XCTAssertEqual(model.messages.count, 3)
-        XCTAssertEqual(model.messages.last?.id, message.id)
-        XCTAssertEqual(model.messages.last?.communicationMethod, .voice)
-        XCTAssertEqual(model.messages.last?.localAudio, replacement)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: original.url.path))
-        XCTAssertEqual(model.history.first?.messages.last?.localAudio, replacement)
-    }
-
-    @MainActor
-    func testOlderRecordingCannotBeReplacedAfterAnotherLearnerMessage() throws {
-        let directory = try makeDirectory()
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let model = makeConversation()
-        let sessionID = try XCTUnwrap(model.activeSessionID)
-        let original = try makeClip(in: directory)
-        XCTAssertTrue(model.commitRecording(original, in: sessionID))
-        let message = try XCTUnwrap(model.messages.last)
-        model.selectMessage(message.id)
-        model.perform(.edit, on: message.id)
-        model.audio.cancelDraft()
-        let later = ConversationMessage(id: "later", sender: .learner, communicationMethod: .text, content: .text("Later"))
-        let session = ConversationSession(id: "later-session", title: "Later", prompt: "Later", messages: model.messages + [later], settings: .init())
-        // A restored session with a newer reply must enforce the same policy.
-        let restored = ConversationViewModel(history: [session])
-        XCTAssertTrue(restored.openConversation(session.id))
-        XCTAssertFalse(restored.actions(for: message).contains(.edit))
-        let replacement = try makeClip(in: directory)
-        XCTAssertFalse(restored.commitRecording(replacement, in: session.id, replacing: message.id))
-        XCTAssertEqual(restored.messages[2].localAudio, original)
-        XCTAssertTrue(FileManager.default.fileExists(atPath: original.url.path))
+        XCTAssertEqual(model.messageVersions.count, 4)
+        XCTAssertNotEqual(edited.id, original.id)
+        XCTAssertEqual(edited.logicalMessageID, original.id)
+        XCTAssertEqual(edited.replacesMessageID, original.id)
+        XCTAssertEqual(edited.modality, .spoken)
+        XCTAssertEqual(model.audioClip(for: edited), replacement)
+        XCTAssertEqual(model.audioClip(for: original), originalClip)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: originalClip.url.path))
+        XCTAssertEqual(model.messageVersions[2], original)
+        XCTAssertFalse(model.isAvailable(.edit, for: original))
+        model.draft = "Later typed reply"
+        XCTAssertTrue(model.submitDraft())
+        XCTAssertFalse(model.commitRecording(replacement, in: id, replacing: edited.id))
     }
 
     @MainActor

@@ -2,27 +2,35 @@ import SwiftUI
 
 struct MessageRow: View {
     let viewModel: ConversationViewModel
-    let message: ConversationMessage
+    let message: Message
     @ScaledMetric(relativeTo: .title3) private var messageSize: CGFloat = 20
     @ScaledMetric(relativeTo: .title2) private var systemMessageSize: CGFloat = 24
 
     private var isSelected: Bool { viewModel.selectedMessageID == message.id }
 
     var body: some View {
-        if message.purpose == .system, case let .text(text) = message.content {
+        if message.purpose == .systemAssistance, case let .text(text) = message.content {
             systemRow(text: text)
         } else {
             switch message.content {
-            case let .audio(duration, _):
-                audioRow(duration: duration)
+            case let .audio(attachment):
+                if message.senderRole == .aiPartner {
+                    audioRow(duration: attachment.durationSeconds)
+                } else {
+                    textRow(text: message.transcription?.text ?? "语音消息 · \(durationLabel(attachment.durationSeconds))")
+                }
             case let .text(text):
                 textRow(text: text)
             }
         }
     }
 
+    private func durationLabel(_ duration: TimeInterval?) -> String {
+        duration.map { "\(Int($0.rounded(.up)))秒" } ?? "时长未知"
+    }
+
     private func systemRow(text: String) -> some View {
-        let isResponse = message.sender == .system
+        let isResponse = message.senderRole == .system
         return HStack(alignment: .top, spacing: 0) {
             if !isResponse { Spacer(minLength: 64) }
             Text(text)
@@ -47,14 +55,14 @@ struct MessageRow: View {
                 }
                 .frame(maxWidth: 225)
                 .accessibilityLabel("\(isResponse ? "小聊系统示例回复" : "我发给小聊系统的消息")：\(text)")
-                .accessibilityIdentifier("message.\(message.id)")
+                .accessibilityIdentifier("message.\(message.logicalMessageID)")
             if isResponse { Spacer(minLength: 64) }
         }
         .padding(.leading, isResponse ? 53 : 24)
         .padding(.trailing, isResponse ? 24 : 69)
     }
 
-    private func audioRow(duration: Int) -> some View {
+    private func audioRow(duration: TimeInterval?) -> some View {
         HStack(alignment: .top, spacing: 0) {
             VStack(alignment: .leading, spacing: 14) {
                 Button {
@@ -66,7 +74,7 @@ struct MessageRow: View {
                             HStack(spacing: 22) {
                                 FigmaImage(artwork: .speakingGlyph)
                                     .frame(width: 51.19, height: 51.2245)
-                                Text("\(duration) sec")
+                                Text(duration.map { "\(Int($0.rounded(.up))) sec" } ?? "语音")
                                     .font(.callout.bold())
                                     .foregroundStyle(Color(white: 146.0 / 255))
                             }
@@ -79,10 +87,10 @@ struct MessageRow: View {
                         }
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("对话伙伴的语音，\(duration)秒")
+                .accessibilityLabel("对话伙伴的语音，\(durationLabel(duration))")
                 .accessibilityValue(isSelected ? "已选择" : "未选择")
                 .accessibilityHint("轻点显示或隐藏消息操作")
-                .accessibilityIdentifier("message.\(message.id)")
+                .accessibilityIdentifier("message.\(message.logicalMessageID)")
                 .overlay(alignment: .topTrailing) {
                     if isSelected {
                         actionRail(isAudio: true)
@@ -108,10 +116,10 @@ struct MessageRow: View {
                     Text(text)
                         .font(.system(size: messageSize))
                         .multilineTextAlignment(.leading)
-                        .foregroundStyle(message.communicationMethod == .voice ? .white : .black)
+                        .foregroundStyle(message.modality == .spoken ? .white : .black)
                         .padding(14)
                         .frame(maxWidth: .infinity, minHeight: 147, alignment: .topLeading)
-                        .background(message.communicationMethod == .voice ? XiaoLiaoTheme.green : .white)
+                        .background(message.modality == .spoken ? XiaoLiaoTheme.green : .white)
                         .clipShape(RoundedRectangle(cornerRadius: 20))
                         .overlay {
                             RoundedRectangle(cornerRadius: 20)
@@ -128,7 +136,7 @@ struct MessageRow: View {
                 .accessibilityLabel("我的消息：\(text)")
                 .accessibilityValue(isSelected ? "已选择" : "未选择")
                 .accessibilityHint("轻点显示或隐藏消息操作")
-                .accessibilityIdentifier("message.\(message.id)")
+                .accessibilityIdentifier("message.\(message.logicalMessageID)")
                 .overlay(alignment: .topLeading) {
                     if isSelected {
                         actionRail(isAudio: false)
@@ -172,7 +180,7 @@ struct MessageRow: View {
 
     @ViewBuilder
     private var detailCard: some View {
-        if viewModel.details[message.id] == .playback, let clip = message.localAudio {
+        if viewModel.details[message.id] == .playback, let clip = viewModel.audioClip(for: message) {
             playbackCard(clip)
         } else if let text = viewModel.detailText(for: message) {
             let isTranscript = viewModel.details[message.id] == .transcript

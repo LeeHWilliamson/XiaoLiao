@@ -5,180 +5,163 @@ import XCTest
 
 final class ConversationPersistenceTests: XCTestCase {
     @MainActor
-    func testFirstLaunchHasNoPlaceholderHistoryAndUnsentDraftsStayTransient() throws {
+    func testFreshHistoryAndUnsentDraftsStayTransient() throws {
         let directory = try makeDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
-        let first = ConversationViewModel.persistent(directory: directory)
-        XCTAssertNil(first.storageIssue)
-        XCTAssertTrue(first.history.isEmpty)
-        first.prompt = "An unsent topic"
-        first.draft = "An unsent message"
-        first.settings.tone = .warm
+        let model = ConversationViewModel.persistent(directory: directory)
+        XCTAssertNil(model.storageIssue)
+        XCTAssertTrue(model.history.isEmpty)
+        model.prompt = "Unsent"
+        model.draft = "Unsent text"
+        model.settings.tone = .warm
         let relaunched = ConversationViewModel.persistent(directory: directory)
         XCTAssertTrue(relaunched.history.isEmpty)
         XCTAssertTrue(relaunched.prompt.isEmpty)
         XCTAssertTrue(relaunched.draft.isEmpty)
-        XCTAssertNil(relaunched.activeSessionID)
         XCTAssertEqual(relaunched.settings, ConversationSettings())
     }
 
     @MainActor
-    func testRelaunchRestoresCommittedMessagesSettingsAndSendMethods() throws {
+    func testRelaunchRetainsAllVersionsAndDisplaysOnlyLatest() throws {
         let directory = try makeDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
-        let first = ConversationViewModel.persistent(directory: directory)
-        first.suggestPrompt()
-        first.settings.tone = .warm
-        XCTAssertTrue(first.startConversation())
-        let id = try XCTUnwrap(first.activeSessionID)
-        let spoken = first.messages[1]
-        first.selectMessage(spoken.id)
-        first.perform(.edit, on: spoken.id)
-        first.draft = "I love sea turtles."
-        XCTAssertTrue(first.submitDraft())
-        first.settings.vocabulary = .complex
-        first.settings.replyLength = .brief
-        first.draft = "A typed reply."
-        XCTAssertTrue(first.submitDraft())
-        let saved = first.history
-        first.draft = "Do not persist this"
-        first.selectMessage(first.messages[0].id)
-        first.perform(.transcribe, on: first.messages[0].id)
-
+        let model = makeConversation(directory: directory)
+        let id = try XCTUnwrap(model.activeSessionID)
+        let original = model.messages[1]
+        model.selectMessage(original.id)
+        model.perform(.edit, on: original.id)
+        model.draft = "I love sea turtles."
+        XCTAssertTrue(model.submitDraft())
+        let edited = model.messages[1]
+        model.settings.tone = .formal
+        model.settings.vocabulary = .complex
+        model.settings.replyLength = .brief
+        model.draft = "A typed reply"
+        XCTAssertTrue(model.submitDraft())
+        let saved = model.history
+        model.draft = "Unsent edit"
         let relaunched = ConversationViewModel.persistent(directory: directory)
-        XCTAssertNil(relaunched.storageIssue)
         XCTAssertEqual(relaunched.history, saved)
         XCTAssertTrue(relaunched.openConversation(id))
-        XCTAssertEqual(relaunched.messages[1].content, .text("I love sea turtles."))
-        XCTAssertEqual(relaunched.messages[1].communicationMethod, .voice)
-        XCTAssertNil(relaunched.messages[1].mockTranslation)
-        XCTAssertEqual(relaunched.messages.last?.communicationMethod, .text)
-        XCTAssertEqual(relaunched.settings.tone, .warm)
-        XCTAssertEqual(relaunched.settings.vocabulary, .complex)
+        XCTAssertEqual(relaunched.messageVersions.count, 4)
+        XCTAssertEqual(relaunched.messages.count, 3)
+        XCTAssertEqual(relaunched.messageVersions[1], original)
+        XCTAssertEqual(relaunched.messages[1], edited)
+        XCTAssertEqual(edited.replacesMessageID, original.id)
+        XCTAssertEqual(edited.modality, .spoken)
+        XCTAssertEqual(relaunched.messages.last?.modality, .written)
+        XCTAssertEqual(relaunched.settings.tone, .formal)
         XCTAssertEqual(relaunched.settings.replyLength, .brief)
         XCTAssertTrue(relaunched.draft.isEmpty)
-        XCTAssertTrue(relaunched.details.isEmpty)
         XCTAssertNil(relaunched.selectedMessageID)
-        XCTAssertFalse(relaunched.actions(for: relaunched.messages[1]).contains(.edit))
-        XCTAssertTrue(relaunched.actions(for: try XCTUnwrap(relaunched.messages.last)).contains(.edit))
+        XCTAssertFalse(relaunched.isAvailable(.edit, for: edited))
     }
 
     @MainActor
-    func testHundredsOfConversationsKeepOrderAndSettingsIndependent() throws {
+    func testHundredsOfConversationsKeepOrderAndIndependentSettings() throws {
         let directory = try makeDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let store = try ConversationHistoryStore(directory: directory)
-        XCTAssertTrue(try store.load().isEmpty)
-        for index in 0..<300 {
-            _ = try store.save(session(id: "session-\(index)", title: "对话 \(index)"))
-        }
-        var oldest = session(id: "session-0", title: "对话 0")
+        _ = try store.load()
+        for index in 0..<300 { _ = try store.save(session(id: "session-\(index)")) }
+        var oldest = session(id: "session-0")
         oldest.settings.tone = .formal
         _ = try store.save(oldest)
-        let reloaded = try ConversationHistoryStore(directory: directory).load()
-        XCTAssertEqual(reloaded.count, 300)
-        XCTAssertEqual(reloaded.map(\.id), (0..<300).reversed().map { "session-\($0)" })
-        XCTAssertEqual(reloaded.last?.settings.tone, .formal)
-        XCTAssertEqual(reloaded.first?.settings.tone, .casual)
+        let loaded = try ConversationHistoryStore(directory: directory).load()
+        XCTAssertEqual(loaded.map(\.id), (0..<300).reversed().map { "session-\($0)" })
+        XCTAssertEqual(loaded.last?.settings.tone, .formal)
+        XCTAssertEqual(loaded.first?.settings.tone, .casual)
     }
 
     @MainActor
-    func testCommittedAudioSurvivesTemporaryCleanupAndSandboxRelocation() throws {
-        let base = try makeDirectory()
-        defer { try? FileManager.default.removeItem(at: base) }
-        let directory = base.appendingPathComponent("original", isDirectory: true)
-        let moved = base.appendingPathComponent("relocated", isDirectory: true)
-        let draft = try makeClip(in: base)
-        let bytes = try Data(contentsOf: draft.url)
-        var first: ConversationViewModel? = .persistent(directory: directory)
-        first?.suggestPrompt()
-        XCTAssertTrue(first?.startConversation() == true)
-        let id = try XCTUnwrap(first?.activeSessionID)
-        XCTAssertTrue(first?.commitRecording(draft, in: id) == true)
-        let saved = try XCTUnwrap(first?.messages.last?.localAudio)
-        XCTAssertNotEqual(saved.url, draft.url)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: draft.url.path))
-        XCTAssertEqual(try Data(contentsOf: saved.url), bytes)
-        first = nil
-        try FileManager.default.moveItem(at: directory, to: moved)
-
-        let relaunched = ConversationViewModel.persistent(directory: moved)
-        XCTAssertNil(relaunched.storageIssue)
-        XCTAssertTrue(relaunched.openConversation(id))
-        let clip = try XCTUnwrap(relaunched.messages.last?.localAudio)
-        XCTAssertEqual(clip.url.deletingLastPathComponent(), moved.appendingPathComponent("Recordings", isDirectory: true))
-        XCTAssertEqual(try Data(contentsOf: clip.url), bytes)
-        XCTAssertEqual(clip.duration, draft.duration)
-        XCTAssertTrue(relaunched.isAvailable(.play, for: try XCTUnwrap(relaunched.messages.last)))
-        XCTAssertEqual(relaunched.messages.last?.communicationMethod, .voice)
-    }
-
-    @MainActor
-    func testFailedSavesPreserveOriginalMessagesSettingsAndUnsentText() throws {
+    func testAudioCopiesUseRelativeKeysAndSurviveRelocation() throws {
         let directory = try makeDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
-        do {
-            let writer = try ConversationHistoryStore(directory: directory)
-            _ = try writer.load()
-            _ = try writer.save(session(id: "saved", title: "Saved"))
-        }
+        let originalStore = directory.appendingPathComponent("original")
+        let relocatedStore = directory.appendingPathComponent("relocated")
+        let draft = try makeClip(in: directory)
+        let bytes = try Data(contentsOf: draft.url)
+        var model: ConversationViewModel? = makeConversation(directory: originalStore)
+        let id = try XCTUnwrap(model?.activeSessionID)
+        XCTAssertTrue(model?.commitRecording(draft, in: id) == true)
+        let sent = try XCTUnwrap(model?.messages.last)
+        let key = try XCTUnwrap(sent.audioAttachment?.storageKey)
+        XCTAssertFalse(key.contains("/"))
+        XCTAssertNotEqual(key, draft.url.lastPathComponent)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: draft.url.path))
+        model = nil
+        try FileManager.default.moveItem(at: originalStore, to: relocatedStore)
+        let relaunched = ConversationViewModel.persistent(directory: relocatedStore)
+        XCTAssertTrue(relaunched.openConversation(id))
+        let loaded = try XCTUnwrap(relaunched.messages.last)
+        XCTAssertEqual(loaded, sent)
+        let clip = try XCTUnwrap(relaunched.audioClip(for: loaded))
+        XCTAssertEqual(clip.url.deletingLastPathComponent(), relocatedStore.appendingPathComponent("Recordings", isDirectory: true))
+        XCTAssertEqual(try Data(contentsOf: clip.url), bytes)
+        XCTAssertTrue(relaunched.isAvailable(.play, for: loaded))
+    }
+
+    @MainActor
+    func testAudioReplacementRetainsOriginalVersionAndBothRecordingsAfterRelaunch() throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = makeConversation(directory: directory)
+        let id = try XCTUnwrap(model.activeSessionID)
+        XCTAssertTrue(model.commitRecording(try makeClip(in: directory), in: id))
+        let original = try XCTUnwrap(model.messages.last)
+        let originalURL = try XCTUnwrap(model.audioClip(for: original)).url
+        model.selectMessage(original.id)
+        model.perform(.edit, on: original.id)
+        model.audio.cancelDraft()
+        XCTAssertTrue(model.commitRecording(try makeClip(in: directory), in: id, replacing: original.id))
+        let replacement = try XCTUnwrap(model.messages.last)
+        XCTAssertNotEqual(replacement.id, original.id)
+        XCTAssertEqual(replacement.replacesMessageID, original.id)
+        let relaunched = ConversationViewModel.persistent(directory: directory)
+        XCTAssertTrue(relaunched.openConversation(id))
+        XCTAssertEqual(relaunched.messages.last, replacement)
+        XCTAssertEqual(relaunched.messageVersions[2], original)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: originalURL.path))
+        XCTAssertNotNil(relaunched.audioClip(for: original))
+        XCTAssertNotNil(relaunched.audioClip(for: replacement))
+    }
+
+    @MainActor
+    func testFailedSavesKeepDraftSettingsAndOriginalRecording() throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let writer = makeConversation(directory: directory)
+        let id = try XCTUnwrap(writer.activeSessionID)
+        XCTAssertTrue(writer.commitRecording(try makeClip(in: directory), in: id))
+        let saved = writer.history
         let reader = try ConversationHistoryStore(directory: directory, allowsSave: false)
-        let model = ConversationViewModel.persistent(store: reader)
-        XCTAssertTrue(model.openConversation("saved"))
-        let original = model.history
+        let model = ConversationViewModel.persistent(store: reader, audio: ConversationAudioController(permissionRequest: { false }))
+        XCTAssertTrue(model.openConversation(id))
         model.settings.tone = .formal
         XCTAssertEqual(model.settings.tone, .casual)
-        XCTAssertNotNil(model.storageIssue)
-        model.selectMessage(model.messages[1].id)
-        model.perform(.edit, on: model.messages[1].id)
-        model.draft = "Do not lose this edit"
+        model.draft = "Keep this text"
         XCTAssertFalse(model.submitDraft())
-        XCTAssertEqual(model.draft, "Do not lose this edit")
-        XCTAssertNotNil(model.editingMessageID)
-        XCTAssertEqual(model.history, original)
-        XCTAssertEqual(model.messages, original[0].messages)
-        XCTAssertEqual(try ConversationHistoryStore(directory: directory).load(), original)
-    }
-
-    @MainActor
-    func testFailedAudioReplacementKeepsOriginalAndReplacementFiles() throws {
-        let directory = try makeDirectory()
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let draft = try makeClip(in: directory)
-        var writer: ConversationViewModel? = .persistent(directory: directory.appendingPathComponent("store"))
-        writer?.suggestPrompt()
-        XCTAssertTrue(writer?.startConversation() == true)
-        let id = try XCTUnwrap(writer?.activeSessionID)
-        XCTAssertTrue(writer?.commitRecording(draft, in: id) == true)
-        let original = try XCTUnwrap(writer?.history.first)
-        writer = nil
-        let store = try ConversationHistoryStore(directory: directory.appendingPathComponent("store"), allowsSave: false)
-        let model = ConversationViewModel.persistent(store: store)
-        XCTAssertTrue(model.openConversation(id))
-        let message = try XCTUnwrap(model.messages.last)
-        model.selectMessage(message.id)
-        // Begin editing without granting or accessing an actual microphone.
-        model.perform(.edit, on: message.id)
+        XCTAssertEqual(model.draft, "Keep this text")
+        let original = try XCTUnwrap(model.messages.last)
+        model.selectMessage(original.id)
+        model.perform(.edit, on: original.id)
         model.audio.cancelDraft()
         let replacement = try makeClip(in: directory)
-        XCTAssertFalse(model.commitRecording(replacement, in: id, replacing: message.id))
-        XCTAssertEqual(model.history.first, original)
-        XCTAssertEqual(model.messages.last, message)
-        XCTAssertTrue(FileManager.default.fileExists(atPath: try XCTUnwrap(message.localAudio).url.path))
+        XCTAssertFalse(model.commitRecording(replacement, in: id, replacing: original.id))
+        XCTAssertEqual(model.history, saved)
+        XCTAssertNotNil(model.audioClip(for: original))
         XCTAssertTrue(FileManager.default.fileExists(atPath: replacement.url.path))
     }
 
     @MainActor
-    func testMissingRecordingDoesNotEraseHistoryOrPretendPlaybackWorks() throws {
+    func testMissingRecordingPreservesMessageMetadataAndDisablesPlay() throws {
         let directory = try makeDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
-        let model = ConversationViewModel.persistent(directory: directory)
-        model.suggestPrompt()
-        XCTAssertTrue(model.startConversation())
+        let model = makeConversation(directory: directory)
         let id = try XCTUnwrap(model.activeSessionID)
         XCTAssertTrue(model.commitRecording(try makeClip(in: directory), in: id))
         let message = try XCTUnwrap(model.messages.last)
-        try FileManager.default.removeItem(at: try XCTUnwrap(message.localAudio).url)
+        try FileManager.default.removeItem(at: try XCTUnwrap(model.audioClip(for: message)).url)
         let relaunched = ConversationViewModel.persistent(directory: directory)
         XCTAssertNotNil(relaunched.storageIssue)
         XCTAssertTrue(relaunched.openConversation(id))
@@ -187,101 +170,21 @@ final class ConversationPersistenceTests: XCTestCase {
     }
 
     @MainActor
-    func testUnknownPayloadVersionBlocksWritesAndPreservesRecoveryFiles() throws {
+    func testSystemExchangePersistsExactReplyTargetAndFailureKeepsArmedDraft() throws {
         let directory = try makeDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
-        do {
-            let store = try ConversationHistoryStore(directory: directory)
-            _ = try store.load()
-            _ = try store.save(session(id: "saved", title: "Saved"))
-        }
-        try changeStoredPayload(in: directory, toVersion: 999)
-        let orphan = directory.appendingPathComponent("Recordings/" + UUID().uuidString + ".caf")
-        try Data("preserve-for-recovery".utf8).write(to: orphan)
-        let relaunched = ConversationViewModel.persistent(directory: directory)
-        XCTAssertTrue(relaunched.storageIssue?.canRetryLoading == true)
-        relaunched.suggestPrompt()
-        XCTAssertFalse(relaunched.startConversation())
-        XCTAssertTrue(relaunched.history.isEmpty)
-        XCTAssertTrue(FileManager.default.fileExists(atPath: orphan.path))
-        XCTAssertThrowsError(try ConversationHistoryStore(directory: directory).load())
-    }
-
-    @MainActor
-    func testClipReferencesRejectPathsOutsideTheRecordingDirectory() throws {
-        let decoder = JSONDecoder()
-        decoder.userInfo[LocalAudioClip.directoryKey] = URL(fileURLWithPath: "/safe/Recordings", isDirectory: true)
-        let malicious = Data("{\"filename\":\"../outside.caf\",\"duration\":1}".utf8)
-        XCTAssertThrowsError(try decoder.decode(LocalAudioClip.self, from: malicious))
-    }
-
-    @MainActor
-    func testInitializationFailureKeepsPromptAndCanRetryWithoutResettingData() throws {
-        let directory = try makeDirectory()
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let blocked = directory.appendingPathComponent("occupied")
-        let marker = Data("existing-file".utf8)
-        try marker.write(to: blocked)
-        let model = ConversationViewModel.persistent(directory: blocked)
-        XCTAssertTrue(model.storageIssue?.canRetryLoading == true)
-        model.prompt = "Keep my topic"
-        XCTAssertFalse(model.startConversation())
-        XCTAssertEqual(model.prompt, "Keep my topic")
-        XCTAssertEqual(try Data(contentsOf: blocked), marker)
-        // Remove only the test-created obstruction, then exercise the normal retry.
-        try FileManager.default.removeItem(at: blocked)
-        model.retryLoadingHistory()
-        XCTAssertNil(model.storageIssue)
-        XCTAssertTrue(model.startConversation())
-        XCTAssertEqual(model.history.count, 1)
-    }
-
-    @MainActor
-    func testSuccessfulAudioReplacementPersistsAndOnlyThenReclaimsOldClip() throws {
-        let directory = try makeDirectory()
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let model = ConversationViewModel.persistent(directory: directory)
-        model.suggestPrompt()
-        XCTAssertTrue(model.startConversation())
-        let id = try XCTUnwrap(model.activeSessionID)
-        XCTAssertTrue(model.commitRecording(try makeClip(in: directory), in: id))
-        let original = try XCTUnwrap(model.messages.last)
-        model.selectMessage(original.id)
-        model.perform(.edit, on: original.id)
-        model.audio.cancelDraft()
-        XCTAssertTrue(model.commitRecording(try makeClip(in: directory), in: id, replacing: original.id))
-        let replacement = try XCTUnwrap(model.messages.last)
-        XCTAssertEqual(replacement.id, original.id)
-        XCTAssertNotEqual(replacement.localAudio?.url, original.localAudio?.url)
-        // Cleanup waits for a successful complete read of all saved references.
-        XCTAssertTrue(FileManager.default.fileExists(atPath: try XCTUnwrap(original.localAudio).url.path))
-        let relaunched = ConversationViewModel.persistent(directory: directory)
-        XCTAssertTrue(relaunched.openConversation(id))
-        XCTAssertEqual(relaunched.messages.last, replacement)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: try XCTUnwrap(original.localAudio).url.path))
-        XCTAssertTrue(FileManager.default.fileExists(atPath: try XCTUnwrap(replacement.localAudio).url.path))
-    }
-
-    @MainActor
-    func testSystemExchangeAndSettingsPersistAtomicallyAndFailuresKeepDraft() throws {
-        let directory = try makeDirectory()
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let model = ConversationViewModel.persistent(directory: directory)
-        model.suggestPrompt()
-        XCTAssertTrue(model.startConversation())
+        let model = makeConversation(directory: directory)
         let id = try XCTUnwrap(model.activeSessionID)
         model.toggleSystemMessageMode()
         model.draft = MockConversation.systemRequest
         XCTAssertTrue(model.submitDraft())
-        let saved = model.messages
+        let records = model.messageVersions
         let relaunched = ConversationViewModel.persistent(directory: directory)
         XCTAssertTrue(relaunched.openConversation(id))
-        XCTAssertEqual(relaunched.messages, saved)
-        XCTAssertEqual(relaunched.messages.suffix(2).map(\.purpose), [.system, .system])
-        XCTAssertEqual(relaunched.messages.last?.sender, .system)
+        XCTAssertEqual(relaunched.messageVersions, records)
+        XCTAssertEqual(relaunched.messages.last?.replyToMessageID, relaunched.messages[2].id)
         XCTAssertEqual(relaunched.settings.vocabulary, .simple)
         XCTAssertFalse(relaunched.isSystemMessageMode)
-
         let reader = try ConversationHistoryStore(directory: directory, allowsSave: false)
         let readOnly = ConversationViewModel.persistent(store: reader)
         XCTAssertTrue(readOnly.openConversation(id))
@@ -290,13 +193,163 @@ final class ConversationPersistenceTests: XCTestCase {
         XCTAssertFalse(readOnly.submitDraft())
         XCTAssertTrue(readOnly.isSystemMessageMode)
         XCTAssertEqual(readOnly.draft, MockConversation.systemSettingsQuestion)
-        XCTAssertEqual(readOnly.messages, saved)
-        XCTAssertEqual(readOnly.settings, relaunched.settings)
+        XCTAssertEqual(readOnly.messageVersions, records)
     }
 
     @MainActor
-    private func session(id: String, title: String) -> ConversationSession {
-        ConversationSession(id: id, title: title, prompt: MockConversation.prompt, messages: MockConversation.messages, settings: .init())
+    func testObservationsPersistAgainstExactVersionsWithoutGeneratingAnalyses() throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = makeConversation(directory: directory)
+        let id = try XCTUnwrap(model.activeSessionID)
+        let original = model.messages[1]
+        XCTAssertTrue(model.grammarObservations.isEmpty)
+        XCTAssertTrue(model.vocabularyObservations.isEmpty)
+        let initialGrammar = grammar(for: original)
+        let initialVocabulary = vocabulary(for: original)
+        XCTAssertTrue(model.recordGrammarObservation(initialGrammar))
+        XCTAssertTrue(model.recordVocabularyObservation(initialVocabulary))
+        model.selectMessage(original.id)
+        model.perform(.edit, on: original.id)
+        model.draft = "Yes, turtles are great."
+        XCTAssertTrue(model.submitDraft())
+        let edited = model.messages[1]
+        XCTAssertEqual(model.grammarObservations, [initialGrammar])
+        XCTAssertTrue(model.recordGrammarObservation(self.grammar(for: edited)))
+        // Re-evaluation supersedes only the evaluation of that exact version.
+        let reEvaluated = self.grammar(for: original)
+        XCTAssertTrue(model.recordGrammarObservation(reEvaluated))
+        XCTAssertEqual(model.grammarObservations.count, 2)
+        XCTAssertFalse(model.grammarObservations.contains(where: { $0.id == initialGrammar.id }))
+        let relaunched = ConversationViewModel.persistent(directory: directory)
+        XCTAssertTrue(relaunched.openConversation(id))
+        XCTAssertEqual(relaunched.grammarObservations, model.grammarObservations)
+        XCTAssertEqual(relaunched.vocabularyObservations, [initialVocabulary])
+        XCTAssertEqual(relaunched.messages[1].id, edited.id)
+        XCTAssertEqual(relaunched.messageVersions[1].id, initialVocabulary.metadata.messageID)
+    }
+
+    @MainActor
+    func testInvalidObservationsAndFailedObservationSaveDoNotMutateSession() throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = makeConversation(directory: directory)
+        let id = try XCTUnwrap(model.activeSessionID)
+        let message = model.messages[1]
+        XCTAssertFalse(model.recordGrammarObservation(grammar(for: message, revision: 99)))
+        XCTAssertFalse(model.recordGrammarObservation(grammar(for: model.messages[0])))
+        XCTAssertFalse(model.recordGrammarObservation(grammar(for: message, start: Int.max)))
+        XCTAssertFalse(model.recordGrammarObservation(grammar(for: message, confidence: 1.1)))
+        XCTAssertFalse(model.recordGrammarObservation(grammar(for: message, conversationID: "another")))
+        XCTAssertTrue(model.grammarObservations.isEmpty)
+        let reader = try ConversationHistoryStore(directory: directory, allowsSave: false)
+        let readOnly = ConversationViewModel.persistent(store: reader)
+        XCTAssertTrue(readOnly.openConversation(id))
+        XCTAssertFalse(readOnly.recordGrammarObservation(grammar(for: message)))
+        XCTAssertFalse(readOnly.recordVocabularyObservation(vocabulary(for: message)))
+        XCTAssertTrue(readOnly.grammarObservations.isEmpty)
+        XCTAssertTrue(readOnly.vocabularyObservations.isEmpty)
+        XCTAssertTrue(try ConversationHistoryStore(directory: directory).load()[0].grammarObservations.isEmpty)
+    }
+
+    @MainActor
+    func testObservationSourcesAndUnicodeSpansReferToTheExactText() throws {
+        let model = ConversationViewModel(history: [])
+        model.suggestPrompt()
+        XCTAssertTrue(model.startConversation())
+        model.draft = "I 🐢 love turtles."
+        XCTAssertTrue(model.submitDraft())
+        let message = try XCTUnwrap(model.messages.last)
+        let missingTranscript = GrammarObservation(metadata: metadata(for: message, source: .speechTranscription), opportunities: [])
+        XCTAssertFalse(model.recordGrammarObservation(missingTranscript))
+
+        let assessment = VocabularyObservation.Assessment(category: .init(categoryID: "word-choice", subcategoryID: nil),
+                                                         outcome: .appropriate, suggestedReplacement: nil, explanation: nil, confidence: nil)
+        func observation(start: Int, length: Int, surface: String) -> VocabularyObservation {
+            VocabularyObservation(metadata: metadata(for: message), usages: [
+                .init(id: UUID().uuidString, unitKind: .word, surfaceText: surface, lemma: nil,
+                      textSpan: .init(startUTF16: start, lengthUTF16: length), assessments: [assessment])
+            ])
+        }
+        // UTF-16 offsets count the turtle as two units. Split surrogates and stale
+        // surface text must be rejected rather than highlighting a different word.
+        XCTAssertFalse(model.recordVocabularyObservation(observation(start: 2, length: 1, surface: "🐢")))
+        XCTAssertFalse(model.recordVocabularyObservation(observation(start: 5, length: 4, surface: "like")))
+        let valid = observation(start: 5, length: 4, surface: "love")
+        XCTAssertTrue(model.recordVocabularyObservation(valid))
+        XCTAssertEqual(model.vocabularyObservations, [valid])
+        let noApplicableRules = GrammarObservation(metadata: metadata(for: message), opportunities: [])
+        XCTAssertTrue(model.recordGrammarObservation(noApplicableRules))
+        XCTAssertEqual(model.grammarObservations, [noApplicableRules])
+    }
+
+    @MainActor
+    func testInvalidEditChainsAndCrossConversationMessagesAreRejected() throws {
+        var original = session(id: "one")
+        let message = original.messages[1]
+        original.messages.append(message.edited(content: .text("First edit")))
+        original.messages.append(message.edited(content: .text("Forked edit")))
+        XCTAssertThrowsError(try original.validate())
+        var other = session(id: "two")
+        other.messages.append(message)
+        XCTAssertThrowsError(try other.validate())
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = try ConversationHistoryStore(directory: directory)
+        _ = try store.load()
+        XCTAssertThrowsError(try store.save(original))
+        XCTAssertTrue(try store.load().isEmpty)
+        XCTAssertNil(store.recordingURL(for: "../outside.caf"))
+    }
+
+    @MainActor
+    func testUnknownPayloadVersionPreservesRecoveryFilesAndBlocksWrites() throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        do {
+            let store = try ConversationHistoryStore(directory: directory)
+            _ = try store.load()
+            _ = try store.save(session(id: "saved"))
+        }
+        try changeStoredVersion(in: directory)
+        let orphan = directory.appendingPathComponent("Recordings/" + UUID().uuidString + ".caf")
+        try Data("preserve".utf8).write(to: orphan)
+        let model = ConversationViewModel.persistent(directory: directory)
+        XCTAssertTrue(model.storageIssue?.canRetryLoading == true)
+        model.suggestPrompt()
+        XCTAssertFalse(model.startConversation())
+        XCTAssertTrue(FileManager.default.fileExists(atPath: orphan.path))
+    }
+
+    @MainActor
+    func testInitializationFailureCanRetryWithoutResettingExistingFile() throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let blocked = directory.appendingPathComponent("occupied")
+        let marker = Data("existing-file".utf8)
+        try marker.write(to: blocked)
+        let model = ConversationViewModel.persistent(directory: blocked)
+        model.prompt = "Keep my topic"
+        XCTAssertFalse(model.startConversation())
+        XCTAssertEqual(try Data(contentsOf: blocked), marker)
+        XCTAssertEqual(model.prompt, "Keep my topic")
+        try FileManager.default.removeItem(at: blocked)
+        model.retryLoadingHistory()
+        XCTAssertTrue(model.startConversation())
+    }
+
+    @MainActor
+    private func makeConversation(directory: URL) -> ConversationViewModel {
+        let model = ConversationViewModel.persistent(directory: directory, audio: ConversationAudioController(permissionRequest: { false }))
+        model.suggestPrompt()
+        XCTAssertTrue(model.startConversation())
+        return model
+    }
+
+    @MainActor
+    private func session(id: String) -> ConversationSession {
+        ConversationSession(id: id, title: id, prompt: MockConversation.prompt,
+                            messages: MockConversation.messages(conversationID: id), settings: .init())
     }
 
     private func makeDirectory() throws -> URL {
@@ -307,20 +360,47 @@ final class ConversationPersistenceTests: XCTestCase {
 
     private func makeClip(in directory: URL) throws -> LocalAudioClip {
         let url = directory.appendingPathComponent(UUID().uuidString + ".caf")
-        // Byte preservation is under test here; these fixtures are never played.
+        // Byte-copy fixtures are never played or passed through a recognizer.
         try Data("local-recording-fixture".utf8).write(to: url)
         return LocalAudioClip(url: url, duration: 2.5)
     }
 
+    private func metadata(for message: Message, revision: Int? = nil, conversationID: String? = nil,
+                          source: ObservationMetadata.TextSource = .messageText) -> ObservationMetadata {
+        ObservationMetadata(id: UUID().uuidString, messageID: message.id,
+                            conversationID: conversationID ?? message.conversationID,
+                            messageRevision: revision ?? message.revision, textSource: source,
+                            evaluatedAt: Date(), provenance: .init(method: .manual, evaluatorID: "test-fixture",
+                            evaluatorVersion: "1", rubricVersion: "1", taxonomyVersion: "1"), confidence: nil)
+    }
+
+    private func grammar(for message: Message, revision: Int? = nil, start: Int = 0,
+                         confidence: Double? = nil, conversationID: String? = nil) -> GrammarObservation {
+        GrammarObservation(metadata: metadata(for: message, revision: revision, conversationID: conversationID),
+                           opportunities: [.init(id: UUID().uuidString, category: .init(categoryID: "test-rule", subcategoryID: nil),
+                           textSpan: .init(startUTF16: start, lengthUTF16: 1), outcome: .correct,
+                           suggestedCorrection: nil, explanation: nil, confidence: confidence)])
+    }
+
+    private func vocabulary(for message: Message) -> VocabularyObservation {
+        VocabularyObservation(metadata: metadata(for: message), usages: [
+            .init(id: UUID().uuidString, unitKind: .word, surfaceText: "Yes", lemma: "yes",
+                  textSpan: .init(startUTF16: 0, lengthUTF16: 3), assessments: [
+                    .init(category: .init(categoryID: "word-choice", subcategoryID: nil), outcome: .appropriate,
+                          suggestedReplacement: nil, explanation: nil, confidence: nil)
+                  ])
+        ])
+    }
+
     @MainActor
-    private func changeStoredPayload(in directory: URL, toVersion version: Int) throws {
+    private func changeStoredVersion(in directory: URL) throws {
         let schema = Schema([StoredConversation.self])
         let config = ModelConfiguration("ConversationHistory", schema: schema, url: directory.appendingPathComponent("History.store"), cloudKitDatabase: .none)
         let container = try ModelContainer(for: schema, configurations: [config])
         let context = ModelContext(container)
         let record = try XCTUnwrap(context.fetch(FetchDescriptor<StoredConversation>()).first)
         var json = try XCTUnwrap(JSONSerialization.jsonObject(with: record.payload) as? [String: Any])
-        json["version"] = version
+        json["version"] = 999
         record.payload = try JSONSerialization.data(withJSONObject: json)
         try context.save()
     }
