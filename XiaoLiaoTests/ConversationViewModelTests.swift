@@ -201,6 +201,93 @@ final class ConversationViewModelTests: XCTestCase {
     }
 
     @MainActor
+    func testSystemModeIsTextOnlyOneShotAndCanBeCancelled() {
+        let model = makeConversation()
+        model.toggleSystemMessageMode()
+        XCTAssertTrue(model.isSystemMessageMode)
+        XCTAssertEqual(model.inputMode, .text)
+        model.showVoiceInput()
+        model.beginRecording()
+        XCTAssertEqual(model.inputMode, .text)
+        XCTAssertEqual(model.audio.recordingState, .idle)
+        model.draft = " \n "
+        XCTAssertFalse(model.submitDraft())
+        XCTAssertTrue(model.isSystemMessageMode)
+        XCTAssertEqual(model.messages, MockConversation.messages)
+        model.draft = "Keep this text"
+        model.toggleSystemMessageMode()
+        XCTAssertFalse(model.isSystemMessageMode)
+        XCTAssertEqual(model.inputMode, .voice)
+        XCTAssertEqual(model.draft, "Keep this text")
+        model.showTextInput()
+        model.toggleSystemMessageMode()
+        model.toggleSystemMessageMode()
+        XCTAssertEqual(model.inputMode, .text)
+    }
+
+    @MainActor
+    func testSystemRequestAddsOnlyTextSystemReplyAndUpdatesLocalSettings() {
+        let model = makeConversation()
+        model.toggleSystemMessageMode()
+        model.draft = MockConversation.systemRequest
+        XCTAssertTrue(model.submitDraft())
+        XCTAssertEqual(model.messages.count, 4)
+        let request = model.messages[2]
+        let response = model.messages[3]
+        XCTAssertEqual(request.sender, .learner)
+        XCTAssertEqual(request.purpose, .system)
+        XCTAssertEqual(request.communicationMethod, .text)
+        XCTAssertEqual(request.content, .text(MockConversation.systemRequest))
+        XCTAssertEqual(response.sender, .system)
+        XCTAssertEqual(response.purpose, .system)
+        XCTAssertEqual(response.content, .text(MockConversation.systemReply))
+        XCTAssertEqual(response.communicationMethod, .text)
+        XCTAssertNil(response.localAudio)
+        XCTAssertTrue(request.actions.isEmpty)
+        XCTAssertTrue(response.actions.isEmpty)
+        XCTAssertFalse(model.isAvailable(.edit, for: model.messages[1]))
+        XCTAssertEqual(model.settings.vocabulary, .simple)
+        XCTAssertFalse(model.isSystemMessageMode)
+        XCTAssertEqual(model.inputMode, .voice)
+        XCTAssertTrue(model.draft.isEmpty)
+        model.draft = "Back to practice"
+        XCTAssertTrue(model.submitDraft())
+        XCTAssertEqual(model.messages.last?.purpose, .conversation)
+        XCTAssertEqual(model.messages.last?.communicationMethod, .text)
+        XCTAssertEqual(model.messages[1].communicationMethod, .voice)
+    }
+
+    @MainActor
+    func testSystemDemoQuestionsAndNavigationKeepModeTransient() {
+        let model = makeConversation()
+        model.settings.tone = .formal
+        model.toggleSystemMessageMode()
+        model.draft = MockConversation.systemSettingsQuestion
+        XCTAssertTrue(model.submitDraft())
+        guard let reply = model.messages.last, case let .text(answer) = reply.content else {
+            return XCTFail("Expected a text system response")
+        }
+        XCTAssertTrue(answer.contains("正式"))
+        XCTAssertTrue(answer.contains("本地示例"))
+        let settings = model.settings
+        model.toggleSystemMessageMode()
+        model.draft = "An arbitrary question"
+        XCTAssertTrue(model.submitDraft())
+        XCTAssertEqual(model.settings, settings)
+        guard let fallbackReply = model.messages.last, case let .text(fallback) = fallbackReply.content else {
+            return XCTFail("Expected a text placeholder response")
+        }
+        XCTAssertTrue(fallback.contains("暂时无法回答任意问题"))
+        model.toggleSystemMessageMode()
+        model.draft = "Unsent system request"
+        let saved = model.history
+        model.leaveFeed()
+        XCTAssertFalse(model.isSystemMessageMode)
+        XCTAssertTrue(model.draft.isEmpty)
+        XCTAssertEqual(model.history, saved)
+    }
+
+    @MainActor
     private func makeConversation() -> ConversationViewModel {
         let model = ConversationViewModel()
         model.suggestPrompt()

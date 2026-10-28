@@ -263,6 +263,38 @@ final class ConversationPersistenceTests: XCTestCase {
     }
 
     @MainActor
+    func testSystemExchangeAndSettingsPersistAtomicallyAndFailuresKeepDraft() throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = ConversationViewModel.persistent(directory: directory)
+        model.suggestPrompt()
+        XCTAssertTrue(model.startConversation())
+        let id = try XCTUnwrap(model.activeSessionID)
+        model.toggleSystemMessageMode()
+        model.draft = MockConversation.systemRequest
+        XCTAssertTrue(model.submitDraft())
+        let saved = model.messages
+        let relaunched = ConversationViewModel.persistent(directory: directory)
+        XCTAssertTrue(relaunched.openConversation(id))
+        XCTAssertEqual(relaunched.messages, saved)
+        XCTAssertEqual(relaunched.messages.suffix(2).map(\.purpose), [.system, .system])
+        XCTAssertEqual(relaunched.messages.last?.sender, .system)
+        XCTAssertEqual(relaunched.settings.vocabulary, .simple)
+        XCTAssertFalse(relaunched.isSystemMessageMode)
+
+        let reader = try ConversationHistoryStore(directory: directory, allowsSave: false)
+        let readOnly = ConversationViewModel.persistent(store: reader)
+        XCTAssertTrue(readOnly.openConversation(id))
+        readOnly.toggleSystemMessageMode()
+        readOnly.draft = MockConversation.systemSettingsQuestion
+        XCTAssertFalse(readOnly.submitDraft())
+        XCTAssertTrue(readOnly.isSystemMessageMode)
+        XCTAssertEqual(readOnly.draft, MockConversation.systemSettingsQuestion)
+        XCTAssertEqual(readOnly.messages, saved)
+        XCTAssertEqual(readOnly.settings, relaunched.settings)
+    }
+
+    @MainActor
     private func session(id: String, title: String) -> ConversationSession {
         ConversationSession(id: id, title: title, prompt: MockConversation.prompt, messages: MockConversation.messages, settings: .init())
     }

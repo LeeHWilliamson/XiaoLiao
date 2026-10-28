@@ -13,6 +13,9 @@ enum XiaoLiaoTheme {
     static let historyScrim = Color("HistoryScrim")
     static let historyGlow = Color("HistoryGlow")
     static let settingsSelection = Color("SettingsSelection")
+    static let systemRequest = Color("SystemRequest")
+    static let systemResponse = Color("SystemResponse")
+    static let systemRequestText = Color("SystemRequestText")
 }
 
 struct PaperBackground: View {

@@ -115,7 +115,7 @@ struct ConversationFeedView: View {
             .accessibilityIdentifier("conversation.record")
 
             HStack {
-                ArtworkButton(label: "切换说话者", glyph: .voiceModeGlyph, isAvailable: false, action: recordingUnavailable)
+                systemModeButton(size: 64)
                 Spacer()
                 ArtworkButton(label: "键盘输入", glyph: .keyboardGlyph) {
                     viewModel.showTextInput()
@@ -194,27 +194,30 @@ struct ConversationFeedView: View {
 
     private var textComposer: some View {
         HStack(spacing: 14) {
-            ArtworkButton(label: "切换说话者", glyph: .voiceModeGlyph, size: 53, isAvailable: false, action: recordingUnavailable)
+            systemModeButton(size: 53)
 
-            TextField("Textbox", text: $viewModel.draft, axis: .vertical)
+            TextField(viewModel.isSystemMessageMode ? "联系推荐人" : "Textbox", text: $viewModel.draft, axis: .vertical)
                 .font(.title2)
                 .lineLimit(1...4)
                 .padding(10)
                 .frame(minHeight: 53)
-                .background(.white)
+                .background(viewModel.isSystemMessageMode ? XiaoLiaoTheme.systemRequest : .white)
                 .overlay { Rectangle().strokeBorder(.black, lineWidth: 1) }
                 .focused($isComposerFocused)
                 .submitLabel(.send)
                 .onSubmit {
                     if viewModel.submitDraft() { isComposerFocused = false }
                 }
-                .accessibilityLabel(viewModel.editingMessageID == nil ? "输入消息" : "编辑消息")
+                .accessibilityLabel(viewModel.isSystemMessageMode ? "向小聊发送系统消息（本地示例）" : viewModel.editingMessageID == nil ? "输入消息" : "编辑消息")
                 .accessibilityIdentifier("conversation.draft")
 
-            ArtworkButton(label: "返回语音输入", glyph: .microphoneGlyph, size: 53) {
+            ArtworkButton(label: "返回语音输入", glyph: .microphoneGlyph, size: 53,
+                          isAvailable: !viewModel.isSystemMessageMode,
+                          unavailableHint: "系统消息仅支持文字，请先取消系统消息模式") {
                 isComposerFocused = false
                 viewModel.showVoiceInput()
             }
+            .opacity(viewModel.isSystemMessageMode ? 0.4 : 1)
             .accessibilityIdentifier("conversation.microphone")
         }
         .padding(.horizontal, 16)
@@ -222,7 +225,18 @@ struct ConversationFeedView: View {
         .frame(maxWidth: .infinity)
     }
 
-    private func recordingUnavailable() {
-        // Speaker switching is outside milestone three.
+    private func systemModeButton(size: CGFloat) -> some View {
+        ArtworkButton(
+            label: viewModel.isSystemMessageMode ? "取消系统消息" : "联系小聊",
+            glyph: .voiceModeGlyph, size: size,
+            isAvailable: !viewModel.audio.hasDraft,
+            unavailableHint: "请先发送或取消当前录音"
+        ) {
+            viewModel.toggleSystemMessageMode()
+            isComposerFocused = viewModel.inputMode == .text
+        }
+        .accessibilityValue(viewModel.isSystemMessageMode ? "已选择" : "未选择")
+        .accessibilityHint(viewModel.audio.hasDraft ? "请先发送或取消当前录音" : "将下一条文字消息发给小聊系统；再次轻点取消。目前使用本地示例回复。")
+        .accessibilityIdentifier("conversation.systemMode")
     }
 }

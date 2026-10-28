@@ -4,16 +4,54 @@ struct MessageRow: View {
     let viewModel: ConversationViewModel
     let message: ConversationMessage
     @ScaledMetric(relativeTo: .title3) private var messageSize: CGFloat = 20
+    @ScaledMetric(relativeTo: .title2) private var systemMessageSize: CGFloat = 24
 
     private var isSelected: Bool { viewModel.selectedMessageID == message.id }
 
     var body: some View {
-        switch message.content {
-        case let .audio(duration, _):
-            audioRow(duration: duration)
-        case let .text(text):
-            textRow(text: text)
+        if message.purpose == .system, case let .text(text) = message.content {
+            systemRow(text: text)
+        } else {
+            switch message.content {
+            case let .audio(duration, _):
+                audioRow(duration: duration)
+            case let .text(text):
+                textRow(text: text)
+            }
         }
+    }
+
+    private func systemRow(text: String) -> some View {
+        let isResponse = message.sender == .system
+        return HStack(alignment: .top, spacing: 0) {
+            if !isResponse { Spacer(minLength: 64) }
+            Text(text)
+                .font(.system(size: systemMessageSize))
+                .multilineTextAlignment(.leading)
+                .foregroundStyle(isResponse ? .white : XiaoLiaoTheme.systemRequestText)
+                .padding(14)
+                .frame(maxWidth: .infinity, minHeight: 147, alignment: .topLeading)
+                .background(isResponse ? XiaoLiaoTheme.systemResponse : XiaoLiaoTheme.systemRequest)
+                .clipShape(RoundedRectangle(cornerRadius: 20))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 20)
+                        .strokeBorder(isResponse ? .white : .black, lineWidth: isResponse ? 4 : 2)
+                }
+                .overlay(alignment: .bottomTrailing) {
+                    if !isResponse {
+                        FigmaImage(artwork: .textTail)
+                            .frame(width: 17.2822, height: 23.3026)
+                            .rotationEffect(.degrees(150))
+                            .offset(x: 4, y: 8)
+                    }
+                }
+                .frame(maxWidth: 225)
+                .accessibilityLabel("\(isResponse ? "小聊系统示例回复" : "我发给小聊系统的消息")：\(text)")
+                .accessibilityIdentifier("message.\(message.id)")
+            if isResponse { Spacer(minLength: 64) }
+        }
+        .padding(.leading, isResponse ? 53 : 24)
+        .padding(.trailing, isResponse ? 24 : 69)
     }
 
     private func audioRow(duration: Int) -> some View {

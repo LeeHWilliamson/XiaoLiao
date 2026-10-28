@@ -193,6 +193,25 @@ Apple references: [SwiftData persistence](https://developer.apple.com/documentat
 
 Stop after local history persistence. No outstanding design choice blocks this implementation; runtime acceptance and the milestone-three microphone checks remain pending.
 
+## Follow-up — inline system requests
+
+Authorized after the user reviewed new Figma frames and confirmed the bottom-left head/arrow control toggles/cancels the mode. Requests are text only; system replies are always text. This replaces the earlier adjustment textbox/modal (`2:89`). The user explicitly waived compatibility work; no migration/reset UI or data deletion was added.
+
+- [x] Inspect current design context/screenshots for `24:89`, `24:189`, and `24:236` using the Figma/SwiftUI workflow.
+- [x] Enable the existing bottom-left control in voice/text composers. Arming focuses a light-blue text field; microphone and recording entry are unavailable. Tapping again cancels. After one successful send, restore the previous composer mode; failed/blank sends retain the draft and mode. Navigation clears an unsent armed request.
+- [x] Store message purpose independently of original voice/text method and add a distinct system sender. Show user requests on the right in `#C4F3FE` with the existing black outline/tail; show replies on the left in `#4C75E1` with white text, four-point white outline, and no tail. Use scaled 24-point system text. Normal message appearance remains unchanged.
+- [x] Add two deterministic demo requests: “你能用更简单的词吗？” updates the local vocabulary setting to Simple; “当前对话设置是什么？” reports actual local settings. Replies include a visible “本地示例” marker. Other input receives an explicit placeholder, without changing settings or inventing a partner response. No AI/network service is integrated.
+- [x] Save both messages and any local setting change in one conversation snapshot. Retain purposes/senders across history/relaunch and preserve the draft on failure. Blue-message action rails remain unavailable because their selected/edit states are not designed.
+- [x] Add three view-model tests, one persistence/failure test, and one UI toggle/send test. New cases cover text-only behavior, blank/cancel/one-message reset, local replies/settings, navigation cleanup, and saved purpose metadata. Tests are source-only until run in Xcode.
+- [x] Add the two blue color assets and `#202020` request-text asset; reuse existing artwork/catalog membership. No Swift source file or Xcode project registration change is needed.
+- [ ] Build/run tests and visually compare the blue composer/request/response in Xcode.
+
+The build attempt failed with `xcodebuild: command not found` (exit 127). No compilation, test pass, or simulator rendering is claimed. Check the existing unit/UI suite on the Mac; the earlier AX runner timeout remains unresolved.
+
+Static checks passed for the three color assets' JSON/exact hex values, shared artwork file references, and whitespace. The Xcode project is unchanged because all Swift changes/tests use existing registered files and the existing catalog contains the new colors. New request/reply geometry and reused tail/control layers were reviewed against the Figma context; effective rendering remains unverified until Xcode comparison.
+
+Manual check: open a conversation, tap the bottom-left control, verify the blue composer/disabled microphone, type “你能用更简单的词吗？” and send using the keyboard. Confirm a light-blue request and dark-blue local-demo reply, normal composer restoration, and Simple vocabulary in conversation settings. Repeat with “当前对话设置是什么？” and arbitrary text. Reopen through history and relaunch to confirm both message types retain their appearance. Check small iPhones, keyboard avoidance, Dynamic Type, VoiceOver labels, and that previous practice messages keep their original colors. Do not treat the local demonstration as live AI understanding or changed generated partner speech.
+
 ## Milestone 4 B — designed statistics (future; not authorized)
 
 Implement the existing conversation/all-time statistics views only after metric definitions are confirmed and separately requested. Acceptance: statistics match defined sample calculations and the app/tests build.

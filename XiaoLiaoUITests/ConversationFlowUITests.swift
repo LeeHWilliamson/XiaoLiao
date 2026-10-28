@@ -160,6 +160,31 @@ final class ConversationFlowUITests: XCTestCase {
         XCTAssertEqual(app.buttons["settings.tone.formal"].value as? String, "已选择")
         XCTAssertEqual(app.buttons["settings.replyLength.brief"].value as? String, "已选择")
     }
+
+    @MainActor
+    func testSystemModeToggleTextOnlyAndOneMessageReset() {
+        let app = XCUIApplication.isolatedHistoryApp()
+        app.launch()
+        app.buttons["conversation.suggest"].tap()
+        app.buttons["conversation.start"].tap()
+        let toggle = app.buttons["conversation.systemMode"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 5))
+        toggle.tap()
+        XCTAssertEqual(toggle.value as? String, "已选择")
+        XCTAssertFalse(app.buttons["conversation.microphone"].isEnabled)
+        toggle.tap()
+        XCTAssertEqual(toggle.value as? String, "未选择")
+        XCTAssertTrue(app.buttons["conversation.record"].exists)
+        toggle.tap()
+        let draft = app.descendants(matching: .any)["conversation.draft"].firstMatch
+        XCTAssertTrue(draft.waitForExistence(timeout: 5))
+        draft.tap()
+        draft.typeText("help\n")
+        let response = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "暂时无法回答任意问题")).firstMatch
+        XCTAssertTrue(response.waitForExistence(timeout: 5))
+        XCTAssertEqual(toggle.value as? String, "未选择")
+        XCTAssertTrue(app.buttons["conversation.record"].isEnabled)
+    }
 }
 
 extension XCUIApplication {

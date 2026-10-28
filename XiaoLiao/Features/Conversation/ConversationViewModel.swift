@@ -22,6 +22,8 @@ final class ConversationViewModel {
     var prompt = ""
     var draft = ""
     var inputMode: InputMode = .voice
+    private(set) var isSystemMessageMode = false
+    @ObservationIgnored private var inputModeBeforeSystem: InputMode = .voice
     var settings = ConversationSettings() {
         didSet {
             guard !isRestoringSettings else { return }
@@ -142,7 +144,7 @@ final class ConversationViewModel {
         guard !audio.hasDraft else { return false }
         switch action {
         case .transcribe: return true
-        case .edit: return canEditMessage(message.id)
+        case .edit: return !isSystemMessageMode && canEditMessage(message.id)
         case .translate: return message.mockTranslation != nil
         case .play:
             return message.localAudio.map { FileManager.default.fileExists(atPath: $0.url.path) } ?? false
@@ -199,6 +201,7 @@ final class ConversationViewModel {
     func submitDraft() -> Bool {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, !audio.hasDraft else { return false }
+        if isSystemMessageMode { return submitSystemMessage(text) }
         var updated = messages
         if let id = editingMessageID {
             guard canEditMessage(id),
@@ -226,6 +229,7 @@ final class ConversationViewModel {
     }
 
     func showVoiceInput() {
+        guard !isSystemMessageMode else { return }
         cancelAudioDraft()
         inputMode = .voice
         draft = ""
@@ -238,7 +242,7 @@ final class ConversationViewModel {
     }
 
     func beginRecording() {
-        guard activeSessionID != nil, !audio.hasDraft else { return }
+        guard activeSessionID != nil, !audio.hasDraft, !isSystemMessageMode else { return }
         draft = ""
         editingMessageID = nil
         selectedMessageID = nil
@@ -263,7 +267,7 @@ final class ConversationViewModel {
     /// after asynchronous work so navigation or a later message cannot replace the wrong reply.
     @discardableResult
     func commitRecording(_ clip: LocalAudioClip, in sessionID: String, replacing id: String? = nil) -> Bool {
-        guard activeSessionID == sessionID, clip.duration.isFinite, clip.duration > 0, clip.duration < Double(Int.max) / 2,
+        guard !isSystemMessageMode, activeSessionID == sessionID, clip.duration.isFinite, clip.duration > 0, clip.duration < Double(Int.max) / 2,
               FileManager.default.fileExists(atPath: clip.url.path) else { return false }
         let label = "语音消息 · \(clip.durationLabel)"
         var updated = messages
@@ -307,8 +311,52 @@ final class ConversationViewModel {
     }
 
     func leaveFeed() {
+        if isSystemMessageMode {
+            draft = ""
+            endSystemMessageMode()
+        }
         cancelAudioDraft()
         audio.stopPlayback()
+    }
+
+    func toggleSystemMessageMode() {
+        guard activeSessionID != nil, !audio.hasDraft else { return }
+        audio.stopPlayback()
+        selectedMessageID = nil
+        if isSystemMessageMode {
+            endSystemMessageMode()
+        } else {
+            // Switching destinations cancels an edit rather than resending its old text.
+            if editingMessageID != nil { draft = "" }
+            editingMessageID = nil
+            inputModeBeforeSystem = inputMode
+            inputMode = .text
+            isSystemMessageMode = true
+        }
+    }
+
+    private func endSystemMessageMode() {
+        isSystemMessageMode = false
+        inputMode = inputModeBeforeSystem
+    }
+
+    private func submitSystemMessage(_ text: String) -> Bool {
+        let response = MockConversation.systemResponse(for: text, settings: settings)
+        var updatedSettings = settings
+        if let vocabulary = response.vocabulary { updatedSettings.vocabulary = vocabulary }
+        let exchange = [
+            ConversationMessage(id: UUID().uuidString, sender: .learner, communicationMethod: .text,
+                                content: .text(text), purpose: .system),
+            ConversationMessage(id: UUID().uuidString, sender: .system, communicationMethod: .text,
+                                content: .text(response.text), purpose: .system)
+        ]
+        // Request, mock reply, and any local setting change form one saved snapshot.
+        guard commitMessages(messages + exchange, settings: updatedSettings) else { return false }
+        draft = ""
+        selectedMessageID = nil
+        editingMessageID = nil
+        endSystemMessageMode()
+        return true
     }
 
     private func toggleDetail(_ detail: Detail, for id: String) {
@@ -322,15 +370,20 @@ final class ConversationViewModel {
         return commitMessages(messages)
     }
 
-    private func commitMessages(_ updated: [ConversationMessage]) -> Bool {
+    private func commitMessages(_ updated: [ConversationMessage], settings updatedSettings: ConversationSettings? = nil) -> Bool {
         guard let id = activeSessionID,
               let index = history.firstIndex(where: { $0.id == id }) else { return false }
         var session = history[index]
         session.messages = updated
-        session.settings = settings
+        session.settings = updatedSettings ?? settings
         guard let saved = persist(session) else { return false }
         history[index] = saved
         messages = saved.messages
+        if settings != saved.settings {
+            isRestoringSettings = true
+            settings = saved.settings
+            isRestoringSettings = false
+        }
         return true
     }
 
@@ -353,6 +406,7 @@ final class ConversationViewModel {
     private func canEditMessage(_ id: String) -> Bool {
         guard let latest = messages.last(where: { $0.sender == .learner }),
               latest.id == id,
+              latest.purpose == .conversation,
               case .text = latest.content else { return false }
         return true
     }
