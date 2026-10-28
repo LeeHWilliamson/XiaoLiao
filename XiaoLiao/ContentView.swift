@@ -1,21 +1,28 @@
-//
-//  ContentView.swift
-//  XiaoLiao
-//
-//  Created by user299515 on 10/26/26.
-//
-
 import SwiftUI
 
 struct ContentView: View {
+    private enum Route: Hashable { case conversation }
+    @State private var path: [Route] = []
+    @State private var conversation = ConversationViewModel()
+
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
+        NavigationStack(path: $path) {
+            NewConversationView(viewModel: conversation) {
+                if conversation.startConversation() {
+                    path.append(.conversation)
+                }
+            }
+            .navigationDestination(for: Route.self) { route in
+                switch route {
+                case .conversation:
+                    ConversationFeedView(viewModel: conversation) {
+                        path.removeAll()
+                    }
+                }
+            }
         }
-        .padding()
+        // The supplied Figma frames define a light-only brand palette.
+        .preferredColorScheme(.light)
     }
 }
 
