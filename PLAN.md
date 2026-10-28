@@ -81,8 +81,9 @@ Both gear controls open Conversation Settings directly in this milestone. No gen
 - Static asset checks passed for all 30 image assets and 12 color assets: catalog JSON, non-empty PNG/PDF files, PNG integrity, PDF page proportions, Swift callsites, and named-color references. The new SVG artwork was downloaded from Figma and converted to vector PDF; the drawer/settings back art was verified identical before reuse. No runtime network client, temporary Figma URL, or third-party package reference was added.
 - Added five session/history unit tests; added two UI flow tests and updated the earlier navigation test for the new drawer. These tests have not run here.
 - The simulator build command failed with `xcodebuild: command not found` (exit 127). No compilation or simulator comparison is claimed. The following Xcode checklist remains the acceptance step.
+- User-reported Mac test attempts: `XiaoLiaoUITests-Runner` on the iPhone 17 Pro simulator failed to initialize for UI testing with `Timed out waiting for AX loaded notification`, including a retry with parallel execution disabled. This is a runner initialization timeout, with no individual failed assertion supplied. UI-test acceptance remains pending. Collect exact Xcode/runtime versions and Activity Monitor readings if continuing diagnosis; neither limited RAM nor app code has been established as the cause. Do not change app assertions or mark tests passed based on this report. The user accepted proceeding with manual checks and has now authorized milestone three.
 
-Source implementation is ready for the user's testing. Stop after this milestone; do not begin audio, general settings, statistics, persistence, or backend integration.
+Milestone-two source implementation is ready for testing. The user reported that the flows look good and subsequently authorized milestone three. General settings, statistics, persisted history, and backend integration remain future work.
 
 ### Milestone-two Xcode checks
 
@@ -109,9 +110,52 @@ Xcode checks: switch to keyboard input and back before sending anything; the exi
 
 Validation: source review and `git diff --check` completed; the Xcode project file is unchanged because the changes and regression tests use existing registered files. The build attempt failed with `xcodebuild: command not found` (exit 127). The new tests and simulator checks have not run here.
 
-## Milestone 3 — local audio practice (future)
+## Milestone 3 — local audio practice
 
-Implement the designed recording, review, playback, and loading states with Apple audio APIs and explicit microphone permission handling. Confirm replay/edit behavior from Figma before implementation. Acceptance: recording/playback lifecycle works on device, with cancellation and interruption handling, and the app builds with its tests passing.
+Authorized 2026-10-28. Implement real local recording/review/playback with Apple audio APIs, preserving the existing Figma feed. Stop after the flow is ready for Xcode/device testing. No live AI or speech recognition is included.
+
+### Confirmed design and scope
+
+- Inspected high-fidelity context and screenshots for recording (`2:121`), playback (`2:303`), voice editing (`2:432`), loading (`2:505`), and sent voice (`2:537`).
+- The user approved reusing the designed Pause/waveform/Send row for review: Pause finalizes the current audio, tapping the waveform previews/pauses it, tapping Pause again resumes, and switching to the keyboard or leaving the feed discards the unsent recording. No new screen or review sheet is added.
+- The user approved audio-only recordings displayed in the existing green learner bubble as “语音消息 · [duration]”. No invented English transcript, translation, synthesized fixture audio, or partner response is produced. Existing fixture details remain as before; their playback stays unavailable because they have no audio file.
+- Only the latest learner message offers Edit. Real recorded messages record a replacement through the designed row; cancellation/failure preserves the original. Existing text and fixture-transcript edits keep using the text composer.
+- The partner-loading bubble in `2:505` is reserved for actual service integration. Local processing is shown in the recording row only while permission/file finalization is genuinely pending. No artificial response-loading delay is introduced.
+
+### Implementation
+
+- [x] Add an observable main-actor audio controller using `AVAudioRecorder`, `AVAudioPlayer`, `AVAudioApplication` microphone permission, and `AVAudioSession` lifecycle handling.
+- [x] Record mono PCM into app-owned temporary CAF files. Pausing closes the current segment; resuming starts another. Join segments in order using fixed-size buffers off the main actor so preview/send reads a finalized file without loading the entire clip into memory.
+- [x] Add real recording duration and level feedback, inline review, pause/resume playback, Send, keyboard/navigation cancellation, and latest-recording replacement.
+- [x] Retain committed clips through in-memory history switches. Delete cancelled segments, superseded reviews, and replaced clips; clear previous-run scratch files on the next controller initialization. History and clips are not restored on relaunch.
+- [x] Handle denied microphone permission with a native alert and system-settings link. Handle recording, finalization, and playback failures without committing a fabricated message.
+- [x] Cancel pending permission/finalization work on navigation/backgrounding/interruption. Stop playback on backgrounding, selected-device removal, and audio-service loss/reset. Never resume automatically.
+- [x] Import the four original Figma Pause/Send/waveform layers, preserving their proportions, and reuse the existing paper, rings, message bubble, and inline timeline assets.
+- [x] Register the audio controller and test source in explicit Xcode groups/Sources phases. Add `NSMicrophoneUsageDescription` to app Debug and Release only; preserve the existing build/signing/deployment/concurrency settings.
+- [x] Add nine focused audio tests covering denied/cancelled permission, interruption while permission is pending, segment order/sample preservation, invalid audio, history retention and message colors, stale-session rejection, atomic replacement/cancellation, and latest-message editing. Extend the existing UI smoke flow to check that recording is enabled and recording-row actions are initially absent. No real microphone or playback is invoked by these automated tests.
+- [ ] Build, run tests, and compare rendering in Xcode; verify the real recording/playback lifecycle on an iPhone.
+
+### Validation status
+
+The build command was attempted here and failed with `xcodebuild: command not found` (exit 127). No successful compilation, XCTest run, simulator rendering, or device audio test is claimed. The existing Mac UI-test runner initialization timeout remains unresolved; it is separate from a failed app assertion. Source/project/asset checks and the manual device checklist below are the handoff, not a replacement for runtime validation.
+
+Static checks passed: the Xcode project parses, all 16 app/four unit-test/three UI-test Swift sources are registered once in their own targets, the asset catalog is registered once, and existing build settings are unchanged apart from the two app microphone usage descriptions. All image-catalog JSON and referenced files were checked; the four new PDFs decode with their original viewport dimensions and were visually inspected. New artwork callsites retain those dimensions and the designed layer composition. `git diff --check` passed. No third-party package, speech service, network client, or background-audio entitlement was added.
+
+Apple API references: [recording](https://developer.apple.com/documentation/avfaudio/avaudiorecorder), [microphone permission](https://developer.apple.com/documentation/avfaudio/avaudioapplication), [audio files and PCM buffers](https://developer.apple.com/documentation/avfaudio/avaudiofile), [interruptions](https://developer.apple.com/documentation/avfaudio/handling-audio-interruptions).
+
+### Xcode and device checklist
+
+1. Build with the retained iOS 26.5 deployment target. Confirm the new controller/test file and four image assets appear in Xcode. Verify the built app's Info contains the microphone usage description in both build configurations. Run `XiaoLiaoTests`, including `ConversationAudioTests`; retry the UI suite when its runner can initialize.
+2. Launch a conversation: there must be no microphone prompt until Record is tapped. Deny permission, confirm the explanation and Settings link, then grant permission and retry. Keep a working keyboard path when permission/input hardware is unavailable.
+3. Record a distinct sentence, Pause, and tap the green waveform to preview it. Tap again to pause playback. Resume recording and say a second sentence; Pause and confirm playback contains both sentences in order with no speech lost or duplicated. Repeat pause/resume more than once.
+4. Send while recording and while paused. Confirm exactly one green “语音消息 · [duration]” bubble is appended, its Play action plays the actual clip, the inline timeline advances, and no fake transcript, translation, or AI reply appears. The original fixture playback must remain disabled.
+5. Send a typed reply and switch composer modes: previously sent voice/typed colors must stay fixed. Only the latest learner message offers Edit. Re-record the latest audio; cancel via keyboard or navigation and confirm the original still plays. Then send a replacement and confirm the same message is updated once and retained in history.
+6. Switch history entries and settings; committed recordings must remain playable in their own entry. Start New Conversation; previous entries stay intact. Unsent recordings/replacements must be discarded on keyboard switching, history/settings navigation, or leaving the feed, including while permission or file processing is pending.
+7. Background/lock the phone during recording and playback; test an incoming interruption and disconnecting headphones. Audio must stop and must not restart automatically. Return and record/play again. Inspect for a stuck recording row, duplicate send, or a lost committed clip after an interruption or permission failure.
+8. Compare the recording and playback layouts to `2:121`, `2:303`, and `2:432` on large/small iPhones, landscape, Dynamic Type, VoiceOver, and Reduce Motion. Confirm 44-point action targets and accessible duration/play/pause/resume/send labels.
+9. Relaunch and confirm history resets. Recordings are temporary current-run data; persistence is milestone four. Physical-device microphone/output behavior still needs testing even if the simulator works.
+
+Stop after milestone three. Open runtime questions: actual microphone/input routing on the user's cloud Mac, physical-device interruption behavior, and visual/accessibility comparison in Xcode. Speech recognition and live partner audio remain future integration work.
 
 ## Milestone 4 — persisted history and designed statistics (future)
 

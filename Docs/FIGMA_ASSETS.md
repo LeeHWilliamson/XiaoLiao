@@ -57,3 +57,16 @@ The drawer's source ring/glyph (`1:929`, `1:931`) were downloaded separately and
 The existing paper texture and watermark are reused. History colors are `#182332` (background), `#EDF2FF` (foreground and selected-row fill), `#174CD7` (selected-row text), `#E6DBC2` at 69% opacity (outside scrim), and `#B7C9FF` at 25% opacity (title glow). Settings use the existing `#D8C9A8` prompt color at 75% opacity and `#8FAA76` for selected options. These six additional named color assets leave AccentColor unchanged.
 
 History uses a native plain List for rows and separators, with the Figma pale trailing border. The settings capsules are custom branded controls: tan/green colors and 77-point height come from the Figma frame rather than the system segmented-control appearance. The user approved Apple system fonts in place of Inter and one “新对话” history row; other labels and visual patterns are retained. Runtime rendering still needs comparison in Xcode.
+
+## Milestone three — local audio practice
+
+Retrieved 2026-10-28 from recording frame [`2:121`](https://www.figma.com/design/jVSZ8R37YkVCJOC32lLmMR/project_V2?node-id=2-121). Original SVG layers were downloaded through the design-context asset URLs and converted to vector PDF using host librsvg/Cairo, preserving each root viewport. No conversion library is added to the app.
+
+| Asset | Source node | Export dimensions | App placement |
+| --- | --- | --- | --- |
+| PauseGlyph | `1:1362` | 23.9229 × 31.9996 | Pause/resume control inside existing 64 × 64 ControlRing |
+| SendAudioGlyph | `2:164` | 32.0015 × 26.4738 | Send control inside existing 64 × 64 ControlRing |
+| RecordingWaveLead | `1:1366` | 41.9879 × 31 | Left waveform layer in the green recording/review row |
+| RecordingWaveTrail | `1:1367` | 42 × 29 | Adjacent right waveform layer in the green recording/review row |
+
+The row uses the design's 77-point green rounded surface and original paired waveform layers; elapsed seconds occupy the dotted status-text slot. The red RecordSurface and named SF Symbol remain underneath, dimmed while a recording draft is open. The user approved reusing this row for pause/review/resume and cancelling via keyboard/navigation. Playback reuses TranscriptLine/TranscriptDot in a seven-dot inline card from `2:303`; the active Play action uses the existing green/white artwork composition. The timeline reflects real clip progress. Newly recorded learner bubbles use the approved audio-only label instead of invented transcription. Existing fixture art and source URLs are unchanged, and no temporary Figma URLs occur at runtime. Effective rendering still requires Xcode comparison.

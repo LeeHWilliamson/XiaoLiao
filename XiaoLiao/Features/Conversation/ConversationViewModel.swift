@@ -5,7 +5,9 @@ import Observation
 @Observable
 final class ConversationViewModel {
     enum InputMode: Equatable { case voice, text }
-    enum Detail: Equatable { case transcript, translation }
+    enum Detail: Equatable { case transcript, translation, playback }
+
+    let audio: ConversationAudioController
 
     var prompt = ""
     var draft = ""
@@ -20,8 +22,9 @@ final class ConversationViewModel {
     private(set) var editingMessageID: String?
     private(set) var details: [String: Detail] = [:]
 
-    init(history: [ConversationSession]? = nil) {
+    init(history: [ConversationSession]? = nil, audio: ConversationAudioController? = nil) {
         self.history = history ?? MockConversation.history
+        self.audio = audio ?? ConversationAudioController()
     }
 
     var canStart: Bool { !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
@@ -71,6 +74,7 @@ final class ConversationViewModel {
 
     func selectMessage(_ id: String) {
         guard messages.contains(where: { $0.id == id }) else { return }
+        if selectedMessageID != id { audio.stopPlayback() }
         selectedMessageID = selectedMessageID == id ? nil : id
     }
 
@@ -84,11 +88,14 @@ final class ConversationViewModel {
 
     func isAvailable(_ action: MessageAction, for message: ConversationMessage) -> Bool {
         guard message.actions.contains(action) else { return false }
+        guard !audio.hasDraft else { return false }
         switch action {
         case .transcribe: return true
         case .edit: return canEditMessage(message.id)
         case .translate: return message.mockTranslation != nil
-        case .play, .repeatAudio: return false // No audio files or service in milestone one.
+        case .play:
+            return message.localAudio.map { FileManager.default.fileExists(atPath: $0.url.path) } ?? false
+        case .repeatAudio: return false // Regeneration requires future service integration.
         }
     }
 
@@ -98,15 +105,29 @@ final class ConversationViewModel {
               isAvailable(action, for: message) else { return }
         switch action {
         case .transcribe:
+            audio.stopPlayback()
             toggleDetail(.transcript, for: id)
         case .translate:
+            audio.stopPlayback()
             toggleDetail(.translation, for: id)
         case .edit:
             guard case let .text(text) = message.content else { return }
+            audio.stopPlayback()
+            details[id] = nil
             editingMessageID = id
-            draft = text
-            inputMode = .text
-        case .play, .repeatAudio:
+            if message.localAudio != nil {
+                draft = ""
+                inputMode = .voice
+                audio.startRecording()
+            } else {
+                draft = text
+                inputMode = .text
+            }
+        case .play:
+            guard let clip = message.localAudio else { return }
+            details[id] = .playback
+            audio.togglePlayback(clip, id: id)
+        case .repeatAudio:
             break
         }
     }
@@ -118,7 +139,7 @@ final class ConversationViewModel {
             return transcript
         case .translation:
             return message.mockTranslation
-        case nil:
+        case .playback, nil:
             return nil
         }
     }
@@ -126,10 +147,11 @@ final class ConversationViewModel {
     @discardableResult
     func submitDraft() -> Bool {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return false }
+        guard !text.isEmpty, !audio.hasDraft else { return false }
         if let id = editingMessageID {
             guard canEditMessage(id),
                   let index = messages.firstIndex(where: { $0.id == id }),
+                  messages[index].localAudio == nil,
                   case .text = messages[index].content else { return false }
             messages[index].content = .text(text)
             // An edited sentence no longer has a valid canned translation.
@@ -143,6 +165,7 @@ final class ConversationViewModel {
                 content: .text(text)
             ))
         }
+        audio.stopPlayback()
         draft = ""
         editingMessageID = nil
         selectedMessageID = nil
@@ -151,9 +174,79 @@ final class ConversationViewModel {
     }
 
     func showVoiceInput() {
+        cancelAudioDraft()
         inputMode = .voice
         draft = ""
         editingMessageID = nil
+    }
+
+    func showTextInput() {
+        cancelAudioDraft()
+        inputMode = .text
+    }
+
+    func beginRecording() {
+        guard activeSessionID != nil, !audio.hasDraft else { return }
+        draft = ""
+        editingMessageID = nil
+        selectedMessageID = nil
+        audio.startRecording()
+    }
+
+    @discardableResult
+    func sendRecording() async -> Bool {
+        guard let sessionID = activeSessionID, audio.canSend else { return false }
+        let replacementID = editingMessageID
+        guard let clip = await audio.finishDraft() else { return false }
+        guard commitRecording(clip, in: sessionID, replacing: replacementID) else {
+            audio.discard(clip)
+            return false
+        }
+        return true
+    }
+
+    /// Commit only after real audio has finalized. Recheck session and edit policy
+    /// after asynchronous work so navigation or a later message cannot replace the wrong reply.
+    @discardableResult
+    func commitRecording(_ clip: LocalAudioClip, in sessionID: String, replacing id: String? = nil) -> Bool {
+        guard activeSessionID == sessionID, clip.duration.isFinite, clip.duration > 0,
+              FileManager.default.fileExists(atPath: clip.url.path) else { return false }
+        let label = "语音消息 · \(clip.durationLabel)"
+        if let id {
+            guard editingMessageID == id, canEditMessage(id),
+                  let index = messages.firstIndex(where: { $0.id == id }),
+                  let previous = messages[index].localAudio else { return false }
+            messages[index].content = .text(label)
+            messages[index].localAudio = clip
+            messages[index].mockTranslation = nil
+            details[id] = nil
+            if previous.url != clip.url { audio.discard(previous) }
+        } else {
+            guard editingMessageID == nil else { return false }
+            messages.append(ConversationMessage(
+                id: UUID().uuidString,
+                sender: .learner,
+                communicationMethod: .voice,
+                content: .text(label),
+                localAudio: clip
+            ))
+        }
+        draft = ""
+        editingMessageID = nil
+        selectedMessageID = nil
+        saveActiveConversation()
+        return true
+    }
+
+    func cancelAudioDraft() {
+        audio.cancelDraft()
+        audio.issue = nil
+        if inputMode == .voice { editingMessageID = nil }
+    }
+
+    func leaveFeed() {
+        cancelAudioDraft()
+        audio.stopPlayback()
     }
 
     private func toggleDetail(_ detail: Detail, for id: String) {
@@ -175,6 +268,7 @@ final class ConversationViewModel {
     }
 
     private func resetPresentation() {
+        leaveFeed()
         selectedMessageID = nil
         details = [:]
         draft = ""

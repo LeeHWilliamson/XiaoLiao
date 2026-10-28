@@ -21,6 +21,8 @@ struct ConversationMessage: Identifiable, Equatable {
     var content: Content
     // This is fixture copy, not the result of a translation service.
     var mockTranslation: String?
+    // Real local audio has no invented transcript or translation.
+    var localAudio: LocalAudioClip? = nil
 
     var actions: [MessageAction] {
         switch content {

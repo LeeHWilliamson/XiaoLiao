@@ -32,6 +32,10 @@ enum FigmaArtwork: String, CaseIterable {
     case backRing = "BackRing"
     case backGlyph = "BackGlyph"
     case settingsRule = "SettingsRule"
+    case pauseGlyph = "PauseGlyph"
+    case sendAudioGlyph = "SendAudioGlyph"
+    case recordingWaveLead = "RecordingWaveLead"
+    case recordingWaveTrail = "RecordingWaveTrail"
 
     var size: CGSize {
         switch self {
@@ -65,6 +69,10 @@ enum FigmaArtwork: String, CaseIterable {
         case .backRing: CGSize(width: 64, height: 64)
         case .backGlyph: CGSize(width: 17.4473, height: 32.0012)
         case .settingsRule: CGSize(width: 314, height: 1)
+        case .pauseGlyph: CGSize(width: 23.9229, height: 31.9996)
+        case .sendAudioGlyph: CGSize(width: 32.0015, height: 26.4738)
+        case .recordingWaveLead: CGSize(width: 41.9879, height: 31)
+        case .recordingWaveTrail: CGSize(width: 42, height: 29)
         }
     }
 }

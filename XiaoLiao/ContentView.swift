@@ -1,4 +1,6 @@
 import SwiftUI
+import AVFoundation
+import Combine
 
 struct ContentView: View {
     private enum Route: Hashable { case conversation, settings }
@@ -6,6 +8,7 @@ struct ContentView: View {
     @State private var conversation = ConversationViewModel()
     @State private var isHistoryPresented = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         ZStack {
@@ -35,6 +38,27 @@ struct ContentView: View {
         }
         // The supplied Figma frames define a light-only brand palette.
         .preferredColorScheme(.light)
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .background { conversation.audio.interrupt() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: AVAudioSession.interruptionNotification)) { notification in
+            if let raw = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
+               AVAudioSession.InterruptionType(rawValue: raw) == .began {
+                conversation.audio.interrupt()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: AVAudioSession.routeChangeNotification)) { notification in
+            if let raw = notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt,
+               AVAudioSession.RouteChangeReason(rawValue: raw) == .oldDeviceUnavailable {
+                conversation.audio.interrupt()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: AVAudioSession.mediaServicesWereResetNotification)) { _ in
+            conversation.audio.interrupt()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: AVAudioSession.mediaServicesWereLostNotification)) { _ in
+            conversation.audio.interrupt()
+        }
         .onChange(of: path) { previous, current in
             if current.isEmpty && previous.contains(.conversation) && conversation.activeSessionID != nil {
                 conversation.prepareNewConversation()
@@ -72,6 +96,7 @@ struct ContentView: View {
     }
 
     private func presentHistory() {
+        conversation.leaveFeed()
         conversation.deselectMessage()
         withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.22)) {
             isHistoryPresented = true
@@ -85,6 +110,7 @@ struct ContentView: View {
     }
 
     private func showSettings() {
+        conversation.leaveFeed()
         conversation.deselectMessage()
         path.append(.settings)
     }

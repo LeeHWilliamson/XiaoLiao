@@ -22,6 +22,9 @@ final class ConversationFlowUITests: XCTestCase {
         let transcript = app.buttons["action.mock-partner-audio.transcribe"]
         XCTAssertTrue(audio.waitForExistence(timeout: 5))
         XCTAssertTrue(learner.exists)
+        XCTAssertTrue(app.buttons["conversation.record"].isEnabled)
+        XCTAssertFalse(app.buttons["conversation.pauseRecording"].exists)
+        XCTAssertFalse(app.buttons["conversation.sendRecording"].exists)
         XCTAssertFalse(learnerTranslation.exists)
         XCTAssertFalse(transcript.exists)
         learner.tap()

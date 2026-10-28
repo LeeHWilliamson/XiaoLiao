@@ -8,6 +8,7 @@ Native SwiftUI iOS app for Chinese speakers practicing conversational English.
 - `XiaoLiao/XiaoLiaoApp.swift`: app entry point.
 - `XiaoLiao/ContentView.swift`: root navigation and shared feature state.
 - `XiaoLiao/Features/Conversation/`: conversation models, local fixtures, view model, and views.
+- `XiaoLiao/Features/Conversation/ConversationAudioController.swift`: local microphone, recording review, playback, and temporary audio-file lifecycle.
 - `XiaoLiao/Design/`: shared colors, background, and artwork controls.
 - `XiaoLiao/Assets.xcassets`: bundled Figma artwork and colors.
 - `XiaoLiaoTests/`, `XiaoLiaoUITests/`: behavior and navigation tests.
@@ -20,14 +21,16 @@ The project uses explicit Xcode groups and file references following a workaroun
 - Use SwiftUI and lightweight MVVM. Keep navigation in the root, presentation in views, state transitions in the feature view model, and mock content in a separate fixture.
 - Use value-type, identifiable messages and typed enums for actions and UI state. Use `@Observable` for the view model, `@State` for its owner, and `@Bindable` where views edit its properties. UI state belongs on the main actor.
 - Store each message's sender and original communication method explicitly. Spoken learner responses use green bubbles/white text; typed learner responses use white bubbles/black text. Switching the composer or editing text must not change a message's original method or appearance. Retain this metadata in history.
-- Only the learner's most recent message may offer Edit; a later partner reply does not remove that eligibility. Hide Edit on older/partner messages and enforce the same policy when beginning and committing edits. The current editor handles text/transcript content; audio recording/editing remains outside the authorized scope.
+- Only the learner's most recent message may offer Edit; a later partner reply does not remove that eligibility. Hide Edit on older/partner messages and enforce the same policy when beginning and committing edits. Text/fixture-transcript edits use the text composer; real recorded messages use the Figma recording row to record a replacement. Keep the original audio/message until its replacement is successfully committed.
 - Use feature directories; extract shared controls only when actually reused. Avoid speculative repositories, dependency containers, coordinators, and service protocols.
 - Keep data local and deterministic initially. Milestones one and two use in-memory state: no backend, AI API, authentication, network service, API keys, analytics, or disk persistence. Do not imply that canned content is generated or translated live.
+- Milestone three permits real local audio using Apple AVFoundation/AVFAudio. Request microphone permission only when the user starts recording. Store clips in app-owned temporary files referenced by in-memory history; delete cancelled/replaced clips and previous-run scratch files. This does not authorize persisted history, speech recognition, synthesized partner speech, uploads, or backend integration.
+- Audio UI state belongs to the main-actor observable audio controller, owned by the feature view model. Close recording segments before playback and join PCM buffers off the main actor. Invalidate pending permission/finalization work on cancellation or navigation, and recheck the active session and latest-message edit policy before committing. Stop recording/playback on backgrounding, audio interruptions, loss of the selected audio device, and media-service failures; never restart automatically.
 - Add no third-party dependencies unless necessary. Prefer Apple frameworks. Bundled PDF artwork is a build asset, not a runtime rendering dependency.
 - Use native layout, scrolling, text input, safe areas, and navigation. Preserve custom Figma artwork rather than replacing it with similar SF Symbols. Use SF Symbols only where the design names them.
 - Centralize brand colors. Use semantic text styles or scaled metrics for custom display sizes; provide VoiceOver labels, selection state, and at least 44-point action targets. Respect Reduce Motion. Do not bake a whole screen screenshot into the UI.
 - Add focused tests for consequential state transitions and navigation. Never claim tests passed or compilation succeeded unless the relevant command actually ran successfully.
-- Keep changes scoped to the requested milestone. The current authorized milestone is conversation history and conversation settings; stop when those flows are ready for Xcode testing. General settings, conversation adjustment, statistics, audio, and backend integration remain future work.
+- Keep changes scoped to the requested milestone. The current authorized milestone is local audio practice (milestone three); stop when that flow is ready for Xcode/device testing. General settings, conversation adjustment, statistics, persisted history, and backend integration remain future work.
 
 ## Design source and constraints
 
@@ -47,10 +50,17 @@ Primary references:
 | V2 • translate_own_message | `2:371` | Inline mock translation |
 | new_convo_with_prompt (drawer open) | `1:914` | Conversation history drawer |
 | V2 • conversation_settings | `2:56` | Tone, vocabulary, and reply-length controls |
+| V2 • recording_audio | `2:121` | Inline recording row with Pause, waveform, Send |
+| V2 • playback_own_message | `2:303` | Active Play action and inline playback timeline |
+| V2 • edit_message | `2:432` | Record a replacement for the latest recorded message |
+| V2 • message_loading | `2:505` | Future partner-response loading; do not fake a service request |
+| V2 • message_sent_voice | `2:537` | Return to the idle feed after sending |
 
 Preserve the cream paper texture, brown outlined controls, green text bubbles, red voice control, Chinese UI copy, English messages, spacing, and adjacent action rails. Device outline/corner mask and status/home indicators in the mockup are device chrome, not app artwork. Use real scroll indicators; do not draw a fake scrollbar for a short feed.
 
-Do not invent screens, tab bars, menus, sheets, or interactions. For missing design states, inspect Figma or request specific screenshots instead of guessing. The history control now opens the designed drawer on both conversation screens. The user explicitly approved a “新对话” row at its top and Apple system fonts in place of Inter for the new history/settings views. This replaces the milestone-one temporary history-to-New-Conversation mapping. Both gear controls open Conversation Settings; settings apply immediately to the current conversation or new-conversation draft, with no added Save action. Keep statistics, general settings, recording, playback, speaker switching, and regeneration unavailable. Do not simulate successful recording or playback.
+Do not invent screens, tab bars, menus, sheets, or interactions. For missing design states, inspect Figma or request specific screenshots instead of guessing. The history control now opens the designed drawer on both conversation screens. The user explicitly approved a “新对话” row at its top and Apple system fonts in place of Inter for the new history/settings views. This replaces the milestone-one temporary history-to-New-Conversation mapping. Both gear controls open Conversation Settings; settings apply immediately to the current conversation or new-conversation draft, with no added Save action. Keep statistics, general settings, speaker switching, and regeneration unavailable. Playback is available only for real local clips; the original fixtures have no audio files. Do not simulate successful recording, playback, transcription, or AI responses.
+
+For milestone three the user approved reusing the existing recording row: Pause finalizes audio for review, tapping its waveform previews/pauses it, tapping Pause again resumes recording, and keyboard switching or leaving the feed discards the unsent recording. Keep the red recording button dimmed/unavailable while this row is open. Use the original exported Pause, Send, and waveform artwork. Use native alerts for microphone denial/audio failures. Real recordings use the existing green learner bubble with “语音消息 · [duration]” and playback; transcription/translation stay unavailable until speech integration. Keep the existing text/fixture editing behavior. Show processing only during actual local file finalization; do not invent a partner-loading delay or a canned response after recording.
 
 An initial prompt is required: users must type one or tap the prompt suggestion button (a deterministic local fixture for now). The user confirmed that the earlier “optional” wording was a mistake. Retain the coffee/turtle mock mistranslation for now, as explicitly requested.
 

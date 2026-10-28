@@ -77,7 +77,7 @@ struct MessageRow: View {
                         .clipShape(RoundedRectangle(cornerRadius: 20))
                         .overlay {
                             RoundedRectangle(cornerRadius: 20)
-                                .strokeBorder(.black, lineWidth: 2)
+                                .strokeBorder(viewModel.editingMessageID == message.id && viewModel.audio.hasDraft ? Color.gray : .black, lineWidth: 2)
                         }
                         .overlay(alignment: .bottomTrailing) {
                             FigmaImage(artwork: .textTail)
@@ -110,14 +110,17 @@ struct MessageRow: View {
         VStack(spacing: isAudio ? -2 : 7) {
             ForEach(Array(viewModel.actions(for: message).enumerated()), id: \.element.id) { index, action in
                 ArtworkButton(
-                    label: action.label,
+                    label: action == .play && viewModel.audio.playbackID == message.id && viewModel.audio.isPlaying
+                        ? "暂停播放" : action.label,
                     glyph: action.glyph(isAudio: isAudio),
                     ring: action.ring(isAudio: isAudio),
                     size: action == .translate && !isAudio ? 43.8146 : 40.6344,
                     isActive: (action == .translate && viewModel.details[message.id] == .translation)
-                        || (action == .transcribe && viewModel.details[message.id] == .transcript),
+                        || (action == .transcribe && viewModel.details[message.id] == .transcript)
+                        || (action == .edit && viewModel.editingMessageID == message.id)
+                        || (action == .play && viewModel.audio.playbackID == message.id && viewModel.audio.isPlaying),
                     isAvailable: viewModel.isAvailable(action, for: message),
-                    unavailableHint: action == .translate ? "此消息没有本地示例翻译" : "本版本尚未接入音频播放或重新生成"
+                    unavailableHint: action == .translate ? "此消息没有本地示例翻译" : "此示例没有录音文件，或该操作暂不可用"
                 ) {
                     viewModel.perform(action, on: message.id)
                 }
@@ -131,7 +134,9 @@ struct MessageRow: View {
 
     @ViewBuilder
     private var detailCard: some View {
-        if let text = viewModel.detailText(for: message) {
+        if viewModel.details[message.id] == .playback, let clip = message.localAudio {
+            playbackCard(clip)
+        } else if let text = viewModel.detailText(for: message) {
             let isTranscript = viewModel.details[message.id] == .transcript
             VStack(alignment: .leading, spacing: 10) {
                 Text(text)
@@ -162,6 +167,38 @@ struct MessageRow: View {
             }
             .accessibilityIdentifier("detail.\(message.id)")
         }
+    }
+
+    private func playbackCard(_ clip: LocalAudioClip) -> some View {
+        let progress = viewModel.audio.playbackID == message.id ? viewModel.audio.playbackProgress : 0
+        return VStack(alignment: .leading, spacing: 10) {
+            Text("语音消息 · \(clip.durationLabel)")
+                .font(.callout)
+            FigmaImage(artwork: .transcriptLine)
+                .frame(maxWidth: 182)
+                .frame(height: 2)
+                .overlay {
+                    HStack(spacing: 0) {
+                        ForEach(0..<7) { index in
+                            FigmaImage(artwork: .transcriptDot)
+                                .frame(width: 17, height: 15)
+                                .opacity(Double(index) / 6 <= progress ? 1 : 0.45)
+                            if index < 6 { Spacer(minLength: 0) }
+                        }
+                    }
+                }
+                .padding(.vertical, 7)
+        }
+        .foregroundStyle(.white)
+        .padding(10)
+        .frame(maxWidth: 201, minHeight: 89, alignment: .topLeading)
+        .background(XiaoLiaoTheme.green)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay { RoundedRectangle(cornerRadius: 10).strokeBorder(.black, lineWidth: 2) }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("语音消息，\(clip.durationLabel)")
+        .accessibilityValue("播放进度\(Int(progress * 100))%")
+        .accessibilityIdentifier("playback.\(message.id)")
     }
 }
 
