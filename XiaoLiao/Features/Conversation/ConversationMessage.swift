@@ -1,12 +1,23 @@
 import Foundation
 
 struct ConversationMessage: Identifiable, Equatable {
+    enum Sender: Equatable {
+        case partner, learner
+    }
+
+    enum CommunicationMethod: Equatable {
+        case voice, text
+    }
+
     enum Content: Equatable {
         case audio(duration: Int, transcript: String)
         case text(String)
     }
 
     let id: String
+    let sender: Sender
+    // Keep the original send method even when the composer changes or text is edited.
+    let communicationMethod: CommunicationMethod
     var content: Content
     // This is fixture copy, not the result of a translation service.
     var mockTranslation: String?
@@ -14,7 +25,7 @@ struct ConversationMessage: Identifiable, Equatable {
     var actions: [MessageAction] {
         switch content {
         case .audio: [.transcribe, .translate, .repeatAudio]
-        case .text: [.translate, .play, .edit]
+        case .text: sender == .learner ? [.translate, .play, .edit] : [.translate, .play]
         }
     }
 }

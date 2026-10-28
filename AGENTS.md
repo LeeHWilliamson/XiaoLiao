@@ -19,6 +19,8 @@ The project uses explicit Xcode groups and file references following a workaroun
 
 - Use SwiftUI and lightweight MVVM. Keep navigation in the root, presentation in views, state transitions in the feature view model, and mock content in a separate fixture.
 - Use value-type, identifiable messages and typed enums for actions and UI state. Use `@Observable` for the view model, `@State` for its owner, and `@Bindable` where views edit its properties. UI state belongs on the main actor.
+- Store each message's sender and original communication method explicitly. Spoken learner responses use green bubbles/white text; typed learner responses use white bubbles/black text. Switching the composer or editing text must not change a message's original method or appearance. Retain this metadata in history.
+- Only the learner's most recent message may offer Edit; a later partner reply does not remove that eligibility. Hide Edit on older/partner messages and enforce the same policy when beginning and committing edits. The current editor handles text/transcript content; audio recording/editing remains outside the authorized scope.
 - Use feature directories; extract shared controls only when actually reused. Avoid speculative repositories, dependency containers, coordinators, and service protocols.
 - Keep data local and deterministic initially. Milestones one and two use in-memory state: no backend, AI API, authentication, network service, API keys, analytics, or disk persistence. Do not imply that canned content is generated or translated live.
 - Add no third-party dependencies unless necessary. Prefer Apple frameworks. Bundled PDF artwork is a build asset, not a runtime rendering dependency.

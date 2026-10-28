@@ -54,7 +54,7 @@ Milestone-one source work is complete. The user reported that the demo looks gre
 2. Leave the coffee/turtle mock mistranslation unchanged for now, as requested.
 3. Replace the temporary history-to-New-Conversation mapping with the history drawer. The user approved a “新对话” row at the top because the Figma drawer has no create control.
 4. Use Apple system fonts rather than Inter in the new history/settings views, as approved, with scaled text sizes.
-5. Keep the existing voice/text-mode bubble styles. Retain the reply-length labels from Figma, including “复杂”; no copy rewrite is part of this milestone.
+5. Preserve the voice/text bubble palette. The user clarified that appearance follows the communication method used to send each message, rather than the current composer mode. Retain the reply-length labels from Figma, including “复杂”; no copy rewrite is part of this milestone.
 
 ## Milestone 2 — conversation history and conversation settings
 
@@ -94,6 +94,20 @@ Source implementation is ready for the user's testing. Stop after this milestone
 - Compare the drawer with `1:914` and settings with `2:56`, allowing only the approved New Conversation row/system-font substitutions and real safe-area layout.
 - Verify history scrolling, small iPhones, landscape, iPad, large accessibility text, VoiceOver focus/selected values, and Reduce Motion. Verify settings Back returns to the correct originating screen.
 - Relaunch and confirm the documented mock reset; persistence belongs to a future milestone. Recording, stats, and live AI generation must remain unavailable.
+
+### Follow-up fixes — message appearance and editing
+
+The user reported two issues: changing composer mode recolored earlier messages, and older learner messages could still be edited.
+
+- [x] Store immutable sender/send-method metadata on messages. Mark the existing green learner fixture as a spoken response displayed as text; mark keyboard submissions as typed.
+- [x] Use the message's send method for bubble/text colors. Preserve that method when editing or reopening history.
+- [x] Show Edit only for the most recent learner message. Enforce eligibility in the view model both when an edit starts and when it commits; partner replies do not change which learner message is latest.
+- [x] Add regression coverage for mixed communication methods, history restoration, editing the latest message, rejecting older/partner edits, and preserving the method when editing a spoken response.
+- [ ] Build and run the tests in Xcode; check colors and contextual actions in the simulator.
+
+Xcode checks: switch to keyboard input and back before sending anything; the existing green response must stay green. Send a typed message and switch to voice; the new message must remain white while the original remains green. Select both learner messages: Edit must appear only beside the latest one. Edit it and reopen the conversation through history; colors and edit eligibility must remain correct. Recording remains unavailable.
+
+Validation: source review and `git diff --check` completed; the Xcode project file is unchanged because the changes and regression tests use existing registered files. The build attempt failed with `xcodebuild: command not found` (exit 127). The new tests and simulator checks have not run here.
 
 ## Milestone 3 — local audio practice (future)
 

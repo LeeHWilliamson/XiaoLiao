@@ -67,6 +67,7 @@ final class ConversationViewModelTests: XCTestCase {
         XCTAssertEqual(model.messages.count, 2)
         XCTAssertEqual(model.messages[1].id, original.id)
         XCTAssertEqual(model.messages[1].content, .text("I love sea turtles."))
+        XCTAssertEqual(model.messages[1].communicationMethod, .voice)
         XCTAssertNil(model.messages[1].mockTranslation)
         XCTAssertNil(model.details[original.id])
         XCTAssertNil(model.editingMessageID)
@@ -115,6 +116,88 @@ final class ConversationViewModelTests: XCTestCase {
                 "Incorrect proportions: \(artwork.rawValue)"
             )
         }
+    }
+
+    @MainActor
+    func testSendMethodsSurviveInputModeChangesAndHistoryRestore() throws {
+        let model = makeConversation()
+        let sessionID = try XCTUnwrap(model.activeSessionID)
+        XCTAssertEqual(model.messages[1].communicationMethod, .voice)
+
+        model.inputMode = .text
+        model.draft = "I typed this message."
+        XCTAssertTrue(model.submitDraft())
+        let typed = try XCTUnwrap(model.messages.last)
+        XCTAssertEqual(typed.sender, .learner)
+        XCTAssertEqual(typed.communicationMethod, .text)
+
+        model.showVoiceInput()
+        XCTAssertEqual(model.messages[1].communicationMethod, .voice)
+        XCTAssertEqual(model.messages.last?.communicationMethod, .text)
+        let savedMessages = model.messages
+        model.prepareNewConversation()
+        XCTAssertTrue(model.openConversation(sessionID))
+        XCTAssertEqual(model.messages, savedMessages)
+        XCTAssertEqual(model.messages.last?.communicationMethod, .text)
+    }
+
+    @MainActor
+    func testOnlyLatestLearnerMessageOffersAndAcceptsEdit() throws {
+        let model = makeConversation()
+        let earlier = model.messages[1]
+        model.draft = "My newest message."
+        XCTAssertTrue(model.submitDraft())
+        let latest = try XCTUnwrap(model.messages.last)
+
+        XCTAssertFalse(model.actions(for: earlier).contains(.edit))
+        XCTAssertFalse(model.isAvailable(.edit, for: earlier))
+        XCTAssertTrue(model.actions(for: earlier).contains(.translate))
+        model.selectMessage(earlier.id)
+        model.perform(.edit, on: earlier.id)
+        XCTAssertNil(model.editingMessageID)
+        XCTAssertEqual(model.draft, "")
+
+        XCTAssertTrue(model.actions(for: latest).contains(.edit))
+        XCTAssertTrue(model.isAvailable(.edit, for: latest))
+        model.selectMessage(latest.id)
+        model.perform(.edit, on: latest.id)
+        XCTAssertEqual(model.editingMessageID, latest.id)
+        model.draft = "My edited newest message."
+        XCTAssertTrue(model.submitDraft())
+        XCTAssertEqual(model.messages[1], earlier)
+        XCTAssertEqual(model.messages.last?.content, .text("My edited newest message."))
+        XCTAssertEqual(model.messages.last?.communicationMethod, .text)
+    }
+
+    @MainActor
+    func testPartnerReplyDoesNotTakeEditingEligibilityFromLatestLearnerMessage() {
+        let learner = ConversationMessage(
+            id: "learner", sender: .learner, communicationMethod: .text,
+            content: .text("I love turtles.")
+        )
+        let partner = ConversationMessage(
+            id: "partner", sender: .partner, communicationMethod: .text,
+            content: .text("What do you like about them?")
+        )
+        let session = ConversationSession(
+            id: "session", title: "乌龟", prompt: MockConversation.prompt,
+            messages: [learner, partner], settings: ConversationSettings()
+        )
+        let model = ConversationViewModel(history: [session])
+        XCTAssertTrue(model.openConversation(session.id))
+        XCTAssertFalse(model.actions(for: partner).contains(.edit))
+        XCTAssertFalse(model.isAvailable(.edit, for: partner))
+        model.selectMessage(partner.id)
+        model.perform(.edit, on: partner.id)
+        XCTAssertNil(model.editingMessageID)
+
+        XCTAssertTrue(model.isAvailable(.edit, for: learner))
+        model.selectMessage(learner.id)
+        model.perform(.edit, on: learner.id)
+        model.draft = "I really love turtles."
+        XCTAssertTrue(model.submitDraft())
+        XCTAssertEqual(model.messages[0].content, .text("I really love turtles."))
+        XCTAssertEqual(model.messages[1], partner)
     }
 
     @MainActor

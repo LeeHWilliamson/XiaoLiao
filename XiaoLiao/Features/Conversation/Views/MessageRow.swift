@@ -70,10 +70,10 @@ struct MessageRow: View {
                     Text(text)
                         .font(.system(size: messageSize))
                         .multilineTextAlignment(.leading)
-                        .foregroundStyle(viewModel.inputMode == .voice ? .white : .black)
+                        .foregroundStyle(message.communicationMethod == .voice ? .white : .black)
                         .padding(14)
                         .frame(maxWidth: .infinity, minHeight: 147, alignment: .topLeading)
-                        .background(viewModel.inputMode == .voice ? XiaoLiaoTheme.green : .white)
+                        .background(message.communicationMethod == .voice ? XiaoLiaoTheme.green : .white)
                         .clipShape(RoundedRectangle(cornerRadius: 20))
                         .overlay {
                             RoundedRectangle(cornerRadius: 20)
@@ -108,7 +108,7 @@ struct MessageRow: View {
 
     private func actionRail(isAudio: Bool) -> some View {
         VStack(spacing: isAudio ? -2 : 7) {
-            ForEach(Array(message.actions.enumerated()), id: \.element.id) { index, action in
+            ForEach(Array(viewModel.actions(for: message).enumerated()), id: \.element.id) { index, action in
                 ArtworkButton(
                     label: action.label,
                     glyph: action.glyph(isAudio: isAudio),

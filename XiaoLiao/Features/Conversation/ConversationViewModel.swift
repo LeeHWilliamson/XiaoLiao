@@ -78,10 +78,15 @@ final class ConversationViewModel {
         selectedMessageID = nil
     }
 
+    func actions(for message: ConversationMessage) -> [MessageAction] {
+        message.actions.filter { $0 != .edit || canEditMessage(message.id) }
+    }
+
     func isAvailable(_ action: MessageAction, for message: ConversationMessage) -> Bool {
         guard message.actions.contains(action) else { return false }
         switch action {
-        case .transcribe, .edit: return true
+        case .transcribe: return true
+        case .edit: return canEditMessage(message.id)
         case .translate: return message.mockTranslation != nil
         case .play, .repeatAudio: return false // No audio files or service in milestone one.
         }
@@ -123,14 +128,20 @@ final class ConversationViewModel {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return false }
         if let id = editingMessageID {
-            guard let index = messages.firstIndex(where: { $0.id == id }),
+            guard canEditMessage(id),
+                  let index = messages.firstIndex(where: { $0.id == id }),
                   case .text = messages[index].content else { return false }
             messages[index].content = .text(text)
             // An edited sentence no longer has a valid canned translation.
             messages[index].mockTranslation = nil
             details[id] = nil
         } else {
-            messages.append(ConversationMessage(id: UUID().uuidString, content: .text(text)))
+            messages.append(ConversationMessage(
+                id: UUID().uuidString,
+                sender: .learner,
+                communicationMethod: .text,
+                content: .text(text)
+            ))
         }
         draft = ""
         editingMessageID = nil
@@ -154,6 +165,13 @@ final class ConversationViewModel {
               let index = history.firstIndex(where: { $0.id == id }) else { return }
         history[index].messages = messages
         history[index].settings = settings
+    }
+
+    private func canEditMessage(_ id: String) -> Bool {
+        guard let latest = messages.last(where: { $0.sender == .learner }),
+              latest.id == id,
+              case .text = latest.content else { return false }
+        return true
     }
 
     private func resetPresentation() {

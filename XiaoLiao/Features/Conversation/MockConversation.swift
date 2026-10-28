@@ -17,11 +17,16 @@ enum MockConversation {
     static let messages: [ConversationMessage] = [
         ConversationMessage(
             id: "mock-partner-audio",
+            sender: .partner,
+            communicationMethod: .voice,
             content: .audio(duration: 5, transcript: "Do you love turtles?"),
             mockTranslation: "我今天喝了杯咖啡"
         ),
         ConversationMessage(
             id: "mock-learner-text",
+            sender: .learner,
+            // The green Figma bubble displays the learner's spoken response as text.
+            communicationMethod: .voice,
             content: .text("Yes, I also love turtles!"),
             mockTranslation: "我今天喝了杯咖啡"
         )
