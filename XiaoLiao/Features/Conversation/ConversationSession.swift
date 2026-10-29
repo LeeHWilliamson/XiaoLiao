@@ -12,11 +12,12 @@ nonisolated struct ConversationSession: Identifiable, Equatable, Codable, Sendab
     var textAnalyses: [MessageTextAnalysis] = []
     var pendingReply: PendingConversationReply?
     var grammarEvaluationJobs: [GrammarEvaluationJob]
+    var pendingTranscription: SpeechTranscriptionJob?
 
     init(id: String, title: String, prompt: String, messages: [Message], settings: ConversationSettings,
          grammarObservations: [GrammarObservation] = [], vocabularyObservations: [VocabularyObservation] = [],
          textAnalyses: [MessageTextAnalysis] = [], pendingReply: PendingConversationReply? = nil,
-         grammarEvaluationJobs: [GrammarEvaluationJob] = []) {
+         grammarEvaluationJobs: [GrammarEvaluationJob] = [], pendingTranscription: SpeechTranscriptionJob? = nil) {
         self.id = id
         self.title = title
         self.prompt = prompt
@@ -27,10 +28,11 @@ nonisolated struct ConversationSession: Identifiable, Equatable, Codable, Sendab
         self.textAnalyses = textAnalyses
         self.pendingReply = pendingReply
         self.grammarEvaluationJobs = grammarEvaluationJobs
+        self.pendingTranscription = pendingTranscription
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, title, prompt, messages, settings, grammarObservations, vocabularyObservations, textAnalyses, pendingReply, grammarEvaluationJobs
+        case id, title, prompt, messages, settings, grammarObservations, vocabularyObservations, textAnalyses, pendingReply, grammarEvaluationJobs, pendingTranscription
     }
 
     init(from decoder: any Decoder) throws {
@@ -45,6 +47,7 @@ nonisolated struct ConversationSession: Identifiable, Equatable, Codable, Sendab
         textAnalyses = try values.decodeIfPresent([MessageTextAnalysis].self, forKey: .textAnalyses) ?? []
         pendingReply = try values.decodeIfPresent(PendingConversationReply.self, forKey: .pendingReply)
         grammarEvaluationJobs = try values.decodeIfPresent([GrammarEvaluationJob].self, forKey: .grammarEvaluationJobs) ?? []
+        pendingTranscription = try values.decodeIfPresent(SpeechTranscriptionJob.self, forKey: .pendingTranscription)
     }
 
     var latestMessages: [Message] { Self.latestVersions(in: messages) }
@@ -113,6 +116,13 @@ nonisolated struct ConversationSession: Identifiable, Equatable, Codable, Sendab
             records[message.id] = message
             latest[message.logicalMessageID] = message
         }
+        if let job = pendingTranscription {
+            guard UUID(uuidString: job.id) != nil, pendingReply == nil,
+                  let message = records[job.messageID], message.countsAsPractice,
+                  message.modality == .spoken, message.audioAttachment != nil,
+                  message.transcription == nil, message.revision == job.messageRevision,
+                  latest[message.logicalMessageID]?.id == message.id else { throw ValidationError.invalidMessage }
+        }
         if let request = pendingReply?.request {
             guard UUID(uuidString: request.requestID) != nil, request.conversationID == id,
                   request.prompt == prompt, records[request.requestID] == nil else { throw ValidationError.invalidMessage }
@@ -132,7 +142,7 @@ nonisolated struct ConversationSession: Identifiable, Equatable, Codable, Sendab
         }
         for job in grammarEvaluationJobs {
             guard UUID(uuidString: job.id) != nil, job.request.conversationID == id,
-                  let message = records[job.request.messageID], case .text = message.content,
+                  let message = records[job.request.messageID],
                   job.request.matches(message), job.request.rubricVersion == GrammarEvaluationRequest.currentRubricVersion,
                   job.request.text.utf16.count <= 4000,
                   !grammarObservations.contains(where: { $0.metadata.messageID == message.id }) else {

@@ -68,10 +68,14 @@ struct ContentView: View {
             Text(conversation.replyIssue ?? "")
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .background { conversation.audio.interrupt() }
+            if phase == .background {
+                conversation.audio.interrupt()
+                conversation.interruptTranscription()
+            }
             if phase == .active {
                 conversation.retryPendingTextAnalyses()
                 conversation.resumeQueuedGrammarEvaluations()
+                conversation.resumeQueuedTranscriptions()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: AVAudioSession.interruptionNotification)) { notification in

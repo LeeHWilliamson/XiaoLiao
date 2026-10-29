@@ -35,7 +35,7 @@ struct ConversationFeedView: View {
                                 MessageRow(viewModel: viewModel, message: message)
                                     .id(message.logicalMessageID)
                             }
-                            if viewModel.pendingReply != nil {
+                            if viewModel.hasPendingResponse {
                                 replyStatus.id("conversation.replyStatus")
                             }
                         }
@@ -56,14 +56,14 @@ struct ConversationFeedView: View {
                     }
                     .scrollDismissesKeyboard(.interactively)
                     .onChange(of: viewModel.messages.count) { _, _ in
-                        if viewModel.pendingReply != nil {
+                        if viewModel.hasPendingResponse {
                             proxy.scrollTo("conversation.replyStatus", anchor: .bottom)
                         } else if let id = viewModel.messages.last?.logicalMessageID {
                             proxy.scrollTo(id, anchor: .bottom)
                         }
                     }
                     .onChange(of: viewModel.isGeneratingReply) { _, _ in
-                        if viewModel.pendingReply != nil { proxy.scrollTo("conversation.replyStatus", anchor: .bottom) }
+                        if viewModel.hasPendingResponse { proxy.scrollTo("conversation.replyStatus", anchor: .bottom) }
                     }
                 }
             }
@@ -121,10 +121,16 @@ struct ConversationFeedView: View {
                                 .rotationEffect(.degrees(-154.56))
                                 .offset(x: 10, y: -2)
                         }
-                        .accessibilityLabel(viewModel.pendingReply?.request.kind == .system ? "小聊系统正在回复" : "对话伙伴正在回复")
+                        .accessibilityLabel(viewModel.pendingTranscription != nil ? "正在转写英语录音" : viewModel.pendingReply?.request.kind == .system ? "小聊系统正在回复" : "对话伙伴正在回复")
                         .accessibilityIdentifier("conversation.replyLoading")
+                    if viewModel.pendingTranscription != nil {
+                        Text("正在转写英语…首次使用可能需要下载识别模型。")
+                            .font(.caption)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("conversation.transcribing")
+                    }
                 } else {
-                    Text(viewModel.pendingReply?.failureMessage ?? "上次回复尚未完成，可以重试。")
+                    Text(viewModel.pendingResponseFailure ?? (viewModel.pendingTranscription != nil ? "转写尚未完成，录音已保留，可以重试。" : "上次回复尚未完成，可以重试。"))
                         .font(.callout)
                         .fixedSize(horizontal: false, vertical: true)
                     HStack {

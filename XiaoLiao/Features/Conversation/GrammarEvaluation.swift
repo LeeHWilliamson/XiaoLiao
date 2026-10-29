@@ -12,7 +12,7 @@ nonisolated struct GrammarEvaluationRequest: Codable, Equatable, Sendable {
     let rubricVersion: String
 
     init?(message: Message) {
-        guard message.countsAsPractice, case .text = message.content,
+        guard message.countsAsPractice,
               let source = message.statisticsText, !source.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               source.text.utf16.count <= 4000, message.revision > 0, message.revision <= 9_007_199_254_740_991,
               UUID(uuidString: message.id) != nil, UUID(uuidString: message.conversationID) != nil else { return nil }

@@ -20,6 +20,7 @@ const post = (value = request(), token = TOKEN) => new Request("https://test.inv
 test("grammar requests validate exact identity, revision, source, text, and rubric", () => {
   const original = request();
   assert.deepEqual(validateGrammarRequest(original), original);
+  assert.equal(validateGrammarRequest({ ...original, textSource: "speechTranscription" }).textSource, "speechTranscription");
   for (const invalid of [{ requestID: "x" }, { messageID: "x" }, { conversationID: "x" }, { messageRevision: 0 },
     { messageRevision: 1.5 }, { messageRevision: Number.MAX_SAFE_INTEGER + 1 }, { textSource: "audio" },
     { text: "" }, { text: "x".repeat(4001) }, { text: "\ud800" }, { rubricVersion: "future" }]) {

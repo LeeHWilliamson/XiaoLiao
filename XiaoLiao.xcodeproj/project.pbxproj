@@ -52,6 +52,8 @@
 		A10A00000000000000000004 /* ConversationReplyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10A00000000000000000003 /* ConversationReplyTests.swift */; };
 		5FD0E45F40F52FED6E4280BC /* GrammarEvaluation.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD84BAF0064322E192E830DF /* GrammarEvaluation.swift */; };
 		6CC11E3E1C05A9B50EC3BF87 /* GrammarEvaluationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4BCC63D68763A418873A253 /* GrammarEvaluationTests.swift */; };
+		FAB0B996692D452B3080F95D /* LocalSpeechTranscriber.swift in Sources */ = {isa = PBXBuildFile; fileRef = 976E4A64E9BA59DCA6D01B92 /* LocalSpeechTranscriber.swift */; };
+		386563EFFD626D28DC3BB709 /* SpeechTranscriptionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A6F324AB562E317788F36AB /* SpeechTranscriptionTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -136,6 +138,9 @@
 		7FBE9D3B40CA6F36AEEC2C64 /* grammar-cases.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = grammar-cases.json; sourceTree = "<group>"; };
 		88A442412C5A7BC4C55740EE /* review-grammar.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = review-grammar.js; sourceTree = "<group>"; };
 		AAE41CC285EF9C919E0D924B /* GRAMMAR_EVALUATION.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = GRAMMAR_EVALUATION.md; sourceTree = "<group>"; };
+		976E4A64E9BA59DCA6D01B92 /* LocalSpeechTranscriber.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalSpeechTranscriber.swift; sourceTree = "<group>"; };
+		3A6F324AB562E317788F36AB /* SpeechTranscriptionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechTranscriptionTests.swift; sourceTree = "<group>"; };
+		DFCA6F8351ED6235EE85210A /* SPEECH_RECOGNITION.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = SPEECH_RECOGNITION.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -198,6 +203,7 @@
 		E329F95D46805A532206D6A3 /* Conversation */ = {
 			isa = PBXGroup;
 			children = (
+				976E4A64E9BA59DCA6D01B92 /* LocalSpeechTranscriber.swift */,
 				DD84BAF0064322E192E830DF /* GrammarEvaluation.swift */,
 				A10A00000000000000000001 /* ConversationReply.swift */,
 				F9DB08A4B0A71D2E9E27DF39 /* ConversationHistoryStore.swift */,
@@ -227,6 +233,7 @@
 		3CF4D9833090438700EBB3F1 /* XiaoLiaoTests */ = {
 			isa = PBXGroup;
 			children = (
+				3A6F324AB562E317788F36AB /* SpeechTranscriptionTests.swift */,
 				C4BCC63D68763A418873A253 /* GrammarEvaluationTests.swift */,
 				A10A00000000000000000003 /* ConversationReplyTests.swift */,
 				75618ECF7546A3E901C6D1C6 /* TextAnalysisPipelineTests.swift */,
@@ -269,6 +276,7 @@
 		A042A750E5204C8392B8DB05 /* Docs */ = {
 			isa = PBXGroup;
 			children = (
+				DFCA6F8351ED6235EE85210A /* SPEECH_RECOGNITION.md */,
 				AAE41CC285EF9C919E0D924B /* GRAMMAR_EVALUATION.md */,
 				A10A00000000000000000005 /* BACKEND_SETUP.md */,
 				A042A750E5204C8392B8DB04 /* FIGMA_ASSETS.md */,
@@ -486,6 +494,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				FAB0B996692D452B3080F95D /* LocalSpeechTranscriber.swift in Sources */,
 				5FD0E45F40F52FED6E4280BC /* GrammarEvaluation.swift in Sources */,
 				A10A00000000000000000002 /* ConversationReply.swift in Sources */,
 				F09E82B45F09E05C58CB59C6 /* StatisticsPreviewData.swift in Sources */,
@@ -524,6 +533,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				386563EFFD626D28DC3BB709 /* SpeechTranscriptionTests.swift in Sources */,
 				6CC11E3E1C05A9B50EC3BF87 /* GrammarEvaluationTests.swift in Sources */,
 				A10A00000000000000000004 /* ConversationReplyTests.swift in Sources */,
 				88BB7F54034D02001F8892A5 /* TextAnalysisPipelineTests.swift in Sources */,
@@ -691,7 +701,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "小聊需要使用麦克风录制你的英语练习语音。录音仅保存在本机，供你在历史对话中试听。";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "小聊需要使用麦克风录制英语练习并在本机转写。录音保存在本机，文字用于对话回复和学习统计。";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -723,7 +733,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "小聊需要使用麦克风录制你的英语练习语音。录音仅保存在本机，供你在历史对话中试听。";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "小聊需要使用麦克风录制英语练习并在本机转写。录音保存在本机，文字用于对话回复和学习统计。";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

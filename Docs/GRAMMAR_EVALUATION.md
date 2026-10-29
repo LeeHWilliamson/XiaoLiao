@@ -13,6 +13,16 @@ npx wrangler deploy
 
 No new secret, storage binding, migration, model account, or Xcode environment variable is required. Reuse the working `OPENAI_API_KEY`, Cloudflare `XIAOLIAO_CLIENT_TOKEN`, and local Xcode `XIAOLIAO_API_TOKEN`. The first key name must include **OPENAI**, not `OPEN_API_KEY`. Build and run the updated Swift app after deploying the Worker. Existing saved messages stay unevaluated; send a NEW message or commit a NEW edit to queue grammar work.
 
+If grammar statistics do not change, check the backend route separately from the app version. A live unauthenticated probe after the user's report returned HTTP 404 with `not_found`; the deployed Worker did not expose the grammar route even though the app was updated. Run `npx wrangler deploy` from the **Backend folder in the same updated checkout**. Then use **重试语法分析** in statistics to retry the saved failed jobs.
+
+This diagnostic request contains no credentials or learner text and cannot call OpenAI:
+
+```sh
+curl -sS -i -X POST https://xiaoliao-api.leeharriswilliamson.workers.dev/v1/grammar/evaluate -H 'Content-Type: application/json' --data '{}'
+```
+
+Expect **401 unauthorized** when the route is deployed and its required configuration is present: this probe deliberately sends no beta token. **404 not_found** means the grammar route is missing from that deployment; **503 not_configured** means required Worker configuration is absent. A successful `/health` response alone does not verify the grammar route, credentials, or model evaluation. After deployment, failed analysis still requires the dashboard's explicit retry; relaunching alone does not resend it.
+
 Suggested manual flow:
 
 1. Send `She go to school every day.` and wait for the partner reply. Grammar runs separately; opening overall statistics must not wait for its network request. Its card shows pending/unfinished counts and refreshes as results arrive.

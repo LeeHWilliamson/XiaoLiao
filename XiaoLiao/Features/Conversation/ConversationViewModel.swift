@@ -7,6 +7,7 @@ final class ConversationViewModel {
     typealias TextAnalyzer = @Sendable (Message) async throws -> MessageTextAnalysis?
     typealias ReplyGenerator = @Sendable (ConversationReplyRequest) async throws -> ConversationReplyResponse
     typealias GrammarEvaluator = @Sendable (GrammarEvaluationRequest) async throws -> GrammarEvaluationResponse
+    typealias AudioTranscriber = @Sendable (LocalAudioClip) async throws -> Message.Transcription
     enum InputMode: Equatable { case voice, text }
     enum Detail: Equatable { case transcript, translation, playback }
 
@@ -34,6 +35,11 @@ final class ConversationViewModel {
     private(set) var activeGrammarRequestIDs: Set<String> = []
     private(set) var grammarStatisticsRevision = 0
     private(set) var grammarQueueIssue: String?
+    @ObservationIgnored private let audioTranscriber: AudioTranscriber?
+    @ObservationIgnored private var transcriptionTask: Task<Void, Never>?
+    @ObservationIgnored private var speechAllowsAutomaticStart = true
+    private(set) var transcriptionQueueIsRunning = false
+    private(set) var transcribingSessionID: String?
 
     var pendingGrammarCount: Int { history.reduce(0) { $0 + $1.grammarEvaluationJobs.count } - failedGrammarCount }
     var failedGrammarCount: Int {
@@ -49,8 +55,15 @@ final class ConversationViewModel {
 
     var usesLiveReplies: Bool { replyGenerator != nil }
     var pendingReply: PendingConversationReply? { history.first { $0.id == activeSessionID }?.pendingReply }
-    var isGeneratingReply: Bool { activeSessionID.map { generatingSessionIDs.contains($0) } ?? false }
-    var canSubmitMessage: Bool { pendingReply == nil }
+    var pendingTranscription: SpeechTranscriptionJob? { history.first { $0.id == activeSessionID }?.pendingTranscription }
+    var hasPendingResponse: Bool { pendingReply != nil || pendingTranscription != nil }
+    var pendingResponseFailure: String? { pendingTranscription?.failureMessage ?? pendingReply?.failureMessage }
+    var isGeneratingReply: Bool {
+        if let id = activeSessionID, generatingSessionIDs.contains(id) { return true }
+        guard let job = pendingTranscription, transcriptionQueueIsRunning else { return false }
+        return job.state == .queued || (job.state == .attempted && activeSessionID == transcribingSessionID)
+    }
+    var canSubmitMessage: Bool { !hasPendingResponse }
 
     var prompt = ""
     var draft = ""
@@ -80,24 +93,27 @@ final class ConversationViewModel {
     private(set) var details: [String: Detail] = [:]
 
     init(history: [ConversationSession]? = nil, audio: ConversationAudioController? = nil,
-         textAnalyzer: TextAnalyzer? = nil, replyGenerator: ReplyGenerator? = nil, grammarEvaluator: GrammarEvaluator? = nil) {
+         textAnalyzer: TextAnalyzer? = nil, replyGenerator: ReplyGenerator? = nil, grammarEvaluator: GrammarEvaluator? = nil,
+         audioTranscriber: AudioTranscriber? = nil) {
         self.history = history ?? MockConversation.history
         self.audio = audio ?? ConversationAudioController()
         self.replyGenerator = replyGenerator
         self.grammarEvaluator = grammarEvaluator
+        self.audioTranscriber = audioTranscriber
         self.textAnalyzer = textAnalyzer ?? { message in
             try await Task.detached(priority: .utility) { try LocalTextAnalyzer.analyze(message) }.value
         }
         retryPendingTextAnalyses()
         resumeQueuedGrammarEvaluations()
+        resumeQueuedTranscriptions()
     }
 
     /// The app opts into disk storage explicitly; tests and previews stay isolated.
     static func persistent(directory: URL? = nil, audio: ConversationAudioController? = nil,
                            textAnalyzer: TextAnalyzer? = nil, replyGenerator: ReplyGenerator? = nil,
-                           grammarEvaluator: GrammarEvaluator? = nil) -> ConversationViewModel {
+                           grammarEvaluator: GrammarEvaluator? = nil, audioTranscriber: AudioTranscriber? = nil) -> ConversationViewModel {
         let model = ConversationViewModel(history: [], audio: audio, textAnalyzer: textAnalyzer,
-                                          replyGenerator: replyGenerator, grammarEvaluator: grammarEvaluator)
+                                          replyGenerator: replyGenerator, grammarEvaluator: grammarEvaluator, audioTranscriber: audioTranscriber)
         model.storageDirectory = directory ?? ConversationHistoryStore.defaultDirectory
         model.retryLoadingHistory()
         return model
@@ -105,9 +121,9 @@ final class ConversationViewModel {
 
     static func persistent(store: ConversationHistoryStore, audio: ConversationAudioController? = nil,
                            textAnalyzer: TextAnalyzer? = nil, replyGenerator: ReplyGenerator? = nil,
-                           grammarEvaluator: GrammarEvaluator? = nil) -> ConversationViewModel {
+                           grammarEvaluator: GrammarEvaluator? = nil, audioTranscriber: AudioTranscriber? = nil) -> ConversationViewModel {
         let model = ConversationViewModel(history: [], audio: audio, textAnalyzer: textAnalyzer,
-                                          replyGenerator: replyGenerator, grammarEvaluator: grammarEvaluator)
+                                          replyGenerator: replyGenerator, grammarEvaluator: grammarEvaluator, audioTranscriber: audioTranscriber)
         model.storageDirectory = store.directory
         model.historyStore = store
         model.retryLoadingHistory()
@@ -128,6 +144,7 @@ final class ConversationViewModel {
             }) ? StorageIssue(message: "部分录音文件暂不可用。对话文字和设置仍已保留。") : nil
             retryPendingTextAnalyses()
             resumeQueuedGrammarEvaluations()
+            resumeQueuedTranscriptions()
         } catch {
             isStorageReady = false
             storageIssue = StorageIssue(message: "无法读取本地历史。已有数据未被清除。请稍后重试。", canRetryLoading: true)
@@ -341,17 +358,26 @@ final class ConversationViewModel {
         let key = clip.url.lastPathComponent
         guard ConversationSession.isRecordingKey(key) else { return false }
         let attachment = Message.AudioAttachment(storageKey: key, durationSeconds: clip.duration)
+        let submitted: Message
         if let id {
             guard editingMessageID == id, canEditMessage(id),
                   let original = messages.first(where: { $0.id == id }), original.audioAttachment != nil else { return false }
-            updated.append(original.edited(content: .audio(attachment)))
+            submitted = original.edited(content: .audio(attachment))
         } else {
             guard editingMessageID == nil else { return false }
-            updated.append(Message(conversationID: sessionID, senderRole: .user, modality: .spoken,
-                                   content: .audio(attachment), replyToMessageID: lastPartnerMessageID))
+            submitted = Message(conversationID: sessionID, senderRole: .user, modality: .spoken,
+                                content: .audio(attachment), replyToMessageID: lastPartnerMessageID)
         }
+        updated.append(submitted)
         temporaryRecordings[key] = clip
-        guard commitMessages(updated) else { return false }
+        guard let index = history.firstIndex(where: { $0.id == sessionID }) else { return false }
+        var session = history[index]
+        session.messages = updated
+        session.settings = settings
+        if audioTranscriber != nil {
+            session.pendingTranscription = .init(message: submitted, requestsPartnerReply: usesLiveReplies)
+        }
+        guard commitSession(session) else { return false }
         if let id { details[id] = nil }
         // Old recordings remain referenced by their immutable message versions.
         if historyStore != nil {
@@ -361,6 +387,7 @@ final class ConversationViewModel {
         draft = ""
         editingMessageID = nil
         selectedMessageID = nil
+        resumeQueuedTranscriptions()
         return true
     }
 
@@ -533,7 +560,7 @@ final class ConversationViewModel {
     }
 
     private func enqueueTextAnalysis(_ message: Message) {
-        guard message.countsAsPractice, case .text = message.content,
+        guard message.countsAsPractice, message.statisticsText != nil,
               !queuedTextMessageIDs.contains(message.id) else { return }
         queuedTextMessageIDs.insert(message.id)
         textAnalysisJobs.append(message)
@@ -654,6 +681,110 @@ final class ConversationViewModel {
 }
 
 extension ConversationViewModel {
+    /// New committed recordings only. Never infer transcription jobs from old audio history.
+    func resumeQueuedTranscriptions() {
+        speechAllowsAutomaticStart = true
+        guard audioTranscriber != nil, transcriptionTask == nil,
+              storageDirectory == nil || isStorageReady,
+              history.contains(where: { $0.pendingTranscription?.state == .queued }) else { return }
+        transcriptionQueueIsRunning = true
+        transcriptionTask = Task { [weak self] in
+            guard let self else { return }
+            await self.drainTranscriptions()
+            let wasCancelled = Task.isCancelled
+            self.transcribingSessionID = nil
+            self.transcriptionQueueIsRunning = false
+            self.transcriptionTask = nil
+            // Foregrounding may have arrived while cancellation was finishing.
+            if wasCancelled && self.speechAllowsAutomaticStart { self.resumeQueuedTranscriptions() }
+        }
+    }
+
+    func interruptTranscription() {
+        speechAllowsAutomaticStart = false
+        transcriptionTask?.cancel()
+    }
+
+    func waitForPendingTranscriptions() async {
+        while let task = transcriptionTask { await task.value }
+    }
+
+    private func retryTranscription(in sessionID: String) {
+        guard !isGeneratingReply, let index = history.firstIndex(where: { $0.id == sessionID }),
+              history[index].pendingTranscription != nil else { return }
+        var session = history[index]
+        session.pendingTranscription?.state = .queued
+        session.pendingTranscription?.failureMessage = nil
+        guard commitSession(session) else { return }
+        resumeQueuedTranscriptions()
+    }
+
+    private func drainTranscriptions() async {
+        guard let audioTranscriber else { return }
+        while !Task.isCancelled, let source = history.reversed().first(where: { $0.pendingTranscription?.state == .queued }),
+              let job = source.pendingTranscription {
+            guard let index = history.firstIndex(where: { $0.id == source.id }),
+                  let message = history[index].messages.first(where: { $0.id == job.messageID }) else { break }
+            var session = history[index]
+            session.pendingTranscription?.state = .attempted
+            guard commitSession(session) else { break }
+            transcribingSessionID = session.id
+            let saved: Bool
+            do {
+                guard let clip = audioClip(for: message) else { throw SpeechTranscriptionError.recordingUnavailable }
+                let transcript = try await audioTranscriber(clip)
+                try Task.checkCancellation()
+                let text = transcript.text.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !text.isEmpty else { throw SpeechTranscriptionError.noSpeech }
+                guard text.utf16.count <= 4000 else { throw SpeechTranscriptionError.tooLong }
+                if let confidence = transcript.confidence {
+                    guard confidence.isFinite, (0...1).contains(confidence) else { throw SpeechTranscriptionError.recognitionFailed }
+                }
+                saved = try completeTranscription(.init(text: text, confidence: transcript.confidence), job: job, in: session.id)
+            } catch {
+                saved = failTranscription(error, job: job, in: session.id)
+            }
+            transcribingSessionID = nil
+            if !saved { break }
+        }
+    }
+
+    private func completeTranscription(_ transcript: Message.Transcription, job: SpeechTranscriptionJob, in sessionID: String) throws -> Bool {
+        guard let index = history.firstIndex(where: { $0.id == sessionID }),
+              history[index].pendingTranscription?.id == job.id,
+              let messageIndex = history[index].messages.firstIndex(where: { $0.id == job.messageID }),
+              history[index].messages[messageIndex].revision == job.messageRevision,
+              history[index].messages[messageIndex].transcription == nil else { return true }
+        var session = history[index]
+        let message = session.messages[messageIndex].attachingTranscription(transcript)
+        session.messages[messageIndex] = message
+        session.pendingTranscription = nil
+        if job.requestsPartnerReply, replyGenerator != nil {
+            session.pendingReply = .init(request: try ConversationReplyRequest(session: session, replyingTo: message), failureMessage: nil)
+        }
+        if grammarEvaluator != nil, let request = GrammarEvaluationRequest(message: message) {
+            session.grammarEvaluationJobs.append(.init(request: request))
+        }
+        // Save enrichment and downstream work atomically before any provider request.
+        guard commitSession(session) else { return false }
+        enqueueTextAnalysis(message)
+        launchReply(in: sessionID)
+        resumeQueuedGrammarEvaluations()
+        return true
+    }
+
+    private func failTranscription(_ error: Error, job: SpeechTranscriptionJob, in sessionID: String) -> Bool {
+        guard let index = history.firstIndex(where: { $0.id == sessionID }),
+              history[index].pendingTranscription?.id == job.id else { return true }
+        var session = history[index]
+        session.pendingTranscription?.state = .failed
+        session.pendingTranscription?.failureMessage = error is CancellationError || Task.isCancelled ? SpeechTranscriptionError.interrupted.localizedDescription
+            : (error as? SpeechTranscriptionError)?.localizedDescription ?? SpeechTranscriptionError.recognitionFailed.localizedDescription
+        return commitSession(session)
+    }
+}
+
+extension ConversationViewModel {
     private func commitTurn(_ updated: [Message], replyingTo message: Message) -> Bool {
         guard let index = history.firstIndex(where: { $0.id == activeSessionID }) else { return false }
         var session = history[index]
@@ -675,6 +806,10 @@ extension ConversationViewModel {
 
     func retryReply() {
         guard let id = activeSessionID else { return }
+        if pendingTranscription != nil {
+            retryTranscription(in: id)
+            return
+        }
         launchReply(in: id)
     }
 
@@ -683,6 +818,7 @@ extension ConversationViewModel {
         guard !isGeneratingReply, let index = history.firstIndex(where: { $0.id == activeSessionID }) else { return }
         var session = history[index]
         session.pendingReply = nil
+        session.pendingTranscription = nil
         _ = commitSession(session)
     }
 

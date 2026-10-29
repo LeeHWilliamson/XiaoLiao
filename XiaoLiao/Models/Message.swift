@@ -123,6 +123,14 @@ nonisolated struct Message: Identifiable, Codable, Equatable, Sendable {
                 origin: senderRole == .user ? .interaction : origin)
     }
 
+    /// Recognition enriches an existing recording, not a new learner practice attempt.
+    func attachingTranscription(_ value: Transcription) -> Message {
+        Message(id: id, logicalMessageID: logicalMessageID, replacesMessageID: replacesMessageID,
+                conversationID: conversationID, createdAt: createdAt, senderRole: senderRole, purpose: purpose,
+                modality: modality, content: content, replyToMessageID: replyToMessageID, revision: revision,
+                transcription: value, status: status, origin: origin, generation: generation)
+    }
+
     var countsAsPractice: Bool {
         senderRole == .user && purpose == .conversationPractice && origin == .interaction && status == .complete
     }
