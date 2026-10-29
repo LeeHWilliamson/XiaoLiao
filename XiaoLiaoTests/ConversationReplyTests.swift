@@ -21,6 +21,10 @@ final class ConversationReplyTests: XCTestCase {
         XCTAssertEqual(partner.modality, .written)
         XCTAssertEqual(partner.origin, .interaction)
         XCTAssertNotNil(partner.generation)
+        XCTAssertTrue(model.actions(for: partner).contains(.play))
+        XCTAssertTrue(model.isAvailable(.play, for: partner))
+        XCTAssertNil(model.audioClip(for: partner)) // Speech reads text; it is not a saved recording.
+        XCTAssertFalse(model.audio.isPlaying) // Receiving a reply never starts audio automatically.
         XCTAssertNil(partner.replyToMessageID)
         XCTAssertNil(model.pendingReply)
         let calls = await probe.calls

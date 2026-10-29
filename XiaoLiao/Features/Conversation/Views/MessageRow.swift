@@ -171,7 +171,7 @@ struct MessageRow: View {
                         || (action == .edit && viewModel.editingMessageID == message.id)
                         || (action == .play && viewModel.audio.playbackID == message.id && viewModel.audio.isPlaying),
                     isAvailable: viewModel.isAvailable(action, for: message),
-                    unavailableHint: action == .translate ? "此消息没有本地示例翻译" : "此示例没有录音文件，或该操作暂不可用"
+                    unavailableHint: action == .translate ? "此消息没有本地示例翻译" : "此消息没有可播放的录音或可朗读的伙伴回复，或该操作暂不可用"
                 ) {
                     viewModel.perform(action, on: message.id)
                 }

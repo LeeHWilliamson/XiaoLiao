@@ -3,29 +3,17 @@ import UIKit
 
 struct ConversationFeedView: View {
     @Bindable var viewModel: ConversationViewModel
-    let onHistory: () -> Void
-    let onSettings: () -> Void
-    let onStatistics: () -> Void
+    let onMenu: () -> Void
     @FocusState private var isComposerFocused: Bool
     @Environment(\.openURL) private var openURL
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(spacing: 0) {
-            ConversationHeader(
-                onHistory: {
-                    isComposerFocused = false
-                    onHistory()
-                },
-                onSettings: {
-                    isComposerFocused = false
-                    onSettings()
-                },
-                onStatistics: {
-                    isComposerFocused = false
-                    onStatistics()
-                }
-            )
+            ConversationHeader {
+                isComposerFocused = false
+                onMenu()
+            }
 
             GeometryReader { geometry in
                 ScrollViewReader { proxy in

@@ -12,6 +12,33 @@ final class ConversationFlowUITests: XCTestCase {
     }
 
     @MainActor
+    func testUnifiedMenuKeepsStatisticsSelectionWhenReopeningTheSameDestination() {
+        let app = XCUIApplication.isolatedHistoryApp()
+        app.launchEnvironment["XIAOLIAO_UI_TEST_STATS_FIXTURE"] = "1"
+        app.launch()
+        XCTAssertEqual(app.buttons.matching(identifier: "navigation.menu").count, 1)
+        XCTAssertFalse(app.buttons["conversation.statistics"].exists)
+        XCTAssertFalse(app.buttons["conversation.settings"].exists)
+        openMenuDestination("menu.statistics", in: app)
+        let articles = app.buttons["stats.grammar.category.article-usage"]
+        XCTAssertTrue(articles.waitForExistence(timeout: 5))
+        articles.tap()
+        let selected = app.staticTexts["stats.grammar.selected"]
+        scrollTo(selected, in: app)
+        XCTAssertTrue(selected.label.contains("冠词"))
+        openMenuDestination("menu.statistics", in: app)
+        XCTAssertTrue(selected.label.contains("冠词"))
+        openMenuDestination("menu.settings", in: app)
+        XCTAssertTrue(app.buttons["settings.tone.casual"].waitForExistence(timeout: 5))
+        openMenu(in: app)
+        let conversationStats = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "menu.sessionStatistics.")).firstMatch
+        XCTAssertTrue(conversationStats.exists)
+        XCTAssertFalse(conversationStats.isEnabled)
+        app.buttons["menu.close"].tap()
+        XCTAssertTrue(app.buttons["settings.tone.casual"].exists)
+    }
+
+    @MainActor
     func testSentTextAutomaticallyAppearsInOverallSentenceStatisticsAfterRelaunch() {
         let app = XCUIApplication.isolatedHistoryApp()
         app.launch()
@@ -22,7 +49,7 @@ final class ConversationFlowUITests: XCTestCase {
         XCTAssertTrue(draft.waitForExistence(timeout: 5))
         draft.tap()
         draft.typeText("Run runs running.\n")
-        app.buttons["conversation.statistics"].tap()
+        openMenuDestination("menu.statistics", in: app)
         let sentence = app.descendants(matching: .any)["stats.activity.sentences"].firstMatch
         XCTAssertTrue(app.buttons["stats.grammar.category.verb-tense"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.staticTexts["stats.empty"].exists)
@@ -32,7 +59,7 @@ final class ConversationFlowUITests: XCTestCase {
         XCTAssertFalse(sentence.label.contains("—"))
         app.terminate()
         app.launch()
-        app.buttons["conversation.statistics"].tap()
+        openMenuDestination("menu.statistics", in: app)
         XCTAssertTrue(app.buttons["stats.grammar.category.verb-tense"].waitForExistence(timeout: 5))
         scrollTo(sentence, in: app)
         XCTAssertTrue(sentence.isHittable)
@@ -45,7 +72,8 @@ final class ConversationFlowUITests: XCTestCase {
         app.launch()
         app.buttons["conversation.suggest"].tap()
         let prompt = app.textViews["conversation.prompt"].value as? String
-        let statistics = app.buttons["conversation.statistics"]
+        openMenu(in: app)
+        let statistics = app.buttons["menu.statistics"]
         XCTAssertTrue(statistics.isEnabled)
         statistics.tap()
         XCTAssertTrue(app.staticTexts["stats.empty"].waitForExistence(timeout: 5))
@@ -55,7 +83,7 @@ final class ConversationFlowUITests: XCTestCase {
         let trendLabel = app.staticTexts["stats.grammar.selected"]
         scrollTo(trendLabel, in: app)
         XCTAssertTrue(trendLabel.label.contains("时态一致性"))
-        app.buttons["stats.back"].tap()
+        returnToConversation(in: app)
         XCTAssertTrue(app.buttons["conversation.start"].waitForExistence(timeout: 5))
         XCTAssertEqual(app.textViews["conversation.prompt"].value as? String, prompt)
         XCTAssertTrue(app.buttons["conversation.start"].isEnabled)
@@ -66,7 +94,7 @@ final class ConversationFlowUITests: XCTestCase {
         let app = XCUIApplication.isolatedHistoryApp()
         app.launchEnvironment["XIAOLIAO_UI_TEST_STATS_FIXTURE"] = "1"
         app.launch()
-        app.buttons["conversation.statistics"].tap()
+        openMenuDestination("menu.statistics", in: app)
         let articles = app.buttons["stats.grammar.category.article-usage"]
         XCTAssertTrue(articles.waitForExistence(timeout: 5))
         XCTAssertFalse(app.staticTexts["stats.empty"].exists)
@@ -80,6 +108,36 @@ final class ConversationFlowUITests: XCTestCase {
         }
         XCTAssertTrue(activity.isHittable)
         XCTAssertFalse(activity.label.contains("—"))
+    }
+
+    @MainActor
+    private func openMenu(in app: XCUIApplication) {
+        let menu = app.buttons["navigation.menu"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 5))
+        menu.tap()
+        XCTAssertTrue(app.buttons["menu.close"].waitForExistence(timeout: 5))
+    }
+
+    @MainActor
+    private func openMenuDestination(_ identifier: String, in app: XCUIApplication) {
+        openMenu(in: app)
+        let destination = app.buttons[identifier]
+        XCTAssertTrue(destination.waitForExistence(timeout: 5))
+        destination.tap()
+        XCTAssertTrue(app.buttons["navigation.menu"].waitForExistence(timeout: 5))
+    }
+
+    @MainActor
+    private func returnToConversation(in app: XCUIApplication) {
+        openMenu(in: app)
+        let selected = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND value == %@",
+                                                        "menu.session.", "已选择")).firstMatch
+        if selected.exists {
+            selected.tap()
+        } else {
+            app.buttons["menu.new"].tap()
+        }
+        XCTAssertTrue(app.buttons["navigation.menu"].waitForExistence(timeout: 5))
     }
 
     @MainActor
@@ -99,9 +157,9 @@ final class ConversationFlowUITests: XCTestCase {
         let learner = fixtureBubble("learner-text", in: app)
         XCTAssertTrue(learner.waitForExistence(timeout: 5))
         let messageID = learner.identifier
-        app.buttons["conversation.statistics"].tap()
-        XCTAssertTrue(app.buttons["stats.back"].waitForExistence(timeout: 5))
-        app.buttons["stats.back"].tap()
+        openMenuDestination("menu.statistics", in: app)
+        XCTAssertTrue(app.buttons["navigation.menu"].waitForExistence(timeout: 5))
+        returnToConversation(in: app)
         XCTAssertTrue(app.buttons[messageID].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["conversation.record"].isEnabled)
     }
@@ -143,8 +201,8 @@ final class ConversationFlowUITests: XCTestCase {
         audio.tap()
         XCTAssertFalse(transcript.exists)
 
-        app.buttons["conversation.history"].tap()
-        let newConversation = app.buttons["history.new"]
+        openMenu(in: app)
+        let newConversation = app.buttons["menu.new"]
         XCTAssertTrue(newConversation.waitForExistence(timeout: 5))
         newConversation.tap()
         XCTAssertTrue(start.waitForExistence(timeout: 5))
@@ -180,39 +238,39 @@ final class ConversationFlowUITests: XCTestCase {
     func testSettingsAreRestoredPerHistoryEntry() {
         let app = XCUIApplication.isolatedHistoryApp()
         app.launch()
-        app.buttons["conversation.settings"].tap()
-        let back = app.buttons["settings.back"]
+        openMenuDestination("menu.settings", in: app)
+        let back = app.buttons["navigation.menu"]
         XCTAssertTrue(back.waitForExistence(timeout: 5))
         app.buttons["settings.tone.warm"].tap()
         app.buttons["settings.vocabulary.complex"].tap()
         app.buttons["settings.replyLength.brief"].tap()
-        back.tap()
+        returnToConversation(in: app)
         app.buttons["conversation.suggest"].tap()
         app.buttons["conversation.start"].tap()
 
-        app.buttons["conversation.settings"].tap()
+        openMenuDestination("menu.settings", in: app)
         XCTAssertTrue(back.waitForExistence(timeout: 5))
         XCTAssertEqual(app.buttons["settings.tone.warm"].value as? String, "已选择")
         app.buttons["settings.tone.formal"].tap()
-        back.tap()
-        app.buttons["conversation.history"].tap()
-        let selected = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND value == %@", "history.session.", "已选择")).firstMatch
+        returnToConversation(in: app)
+        openMenu(in: app)
+        let selected = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND value == %@", "menu.session.", "已选择")).firstMatch
         XCTAssertTrue(selected.waitForExistence(timeout: 5))
         let savedID = selected.identifier
-        app.buttons["history.new"].tap()
+        app.buttons["menu.new"].tap()
         app.buttons["conversation.suggest"].tap()
         app.buttons["conversation.start"].tap()
 
-        app.buttons["conversation.settings"].tap()
+        openMenuDestination("menu.settings", in: app)
         XCTAssertTrue(back.waitForExistence(timeout: 5))
         XCTAssertEqual(app.buttons["settings.tone.casual"].value as? String, "已选择")
         XCTAssertEqual(app.buttons["settings.vocabulary.medium"].value as? String, "已选择")
         XCTAssertEqual(app.buttons["settings.replyLength.medium"].value as? String, "已选择")
-        back.tap()
-        app.buttons["conversation.history"].tap()
+        returnToConversation(in: app)
+        openMenu(in: app)
         XCTAssertTrue(app.buttons[savedID].waitForExistence(timeout: 5))
         app.buttons[savedID].tap()
-        app.buttons["conversation.settings"].tap()
+        openMenuDestination("menu.settings", in: app)
         XCTAssertTrue(back.waitForExistence(timeout: 5))
         XCTAssertEqual(app.buttons["settings.tone.formal"].value as? String, "已选择")
         XCTAssertEqual(app.buttons["settings.vocabulary.complex"].value as? String, "已选择")
@@ -226,8 +284,8 @@ final class ConversationFlowUITests: XCTestCase {
         app.buttons["conversation.suggest"].tap()
         let prompt = app.textViews["conversation.prompt"]
         let original = prompt.value as? String
-        app.buttons["conversation.history"].tap()
-        let close = app.buttons["history.close"]
+        openMenu(in: app)
+        let close = app.buttons["menu.close"]
         XCTAssertTrue(close.waitForExistence(timeout: 5))
         close.tap()
         XCTAssertTrue(prompt.waitForExistence(timeout: 5))
@@ -241,25 +299,25 @@ final class ConversationFlowUITests: XCTestCase {
         app.launch()
         app.buttons["conversation.suggest"].tap()
         app.buttons["conversation.start"].tap()
-        app.buttons["conversation.settings"].tap()
-        let back = app.buttons["settings.back"]
+        openMenuDestination("menu.settings", in: app)
+        let back = app.buttons["navigation.menu"]
         XCTAssertTrue(back.waitForExistence(timeout: 5))
         app.buttons["settings.tone.formal"].tap()
         app.buttons["settings.replyLength.brief"].tap()
-        back.tap()
-        app.buttons["conversation.history"].tap()
-        let selected = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND value == %@", "history.session.", "已选择")).firstMatch
+        returnToConversation(in: app)
+        openMenu(in: app)
+        let selected = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND value == %@", "menu.session.", "已选择")).firstMatch
         XCTAssertTrue(selected.waitForExistence(timeout: 5))
         let savedID = selected.identifier
         app.terminate()
         app.launch()
-        XCTAssertTrue(app.buttons["conversation.history"].waitForExistence(timeout: 5))
-        app.buttons["conversation.history"].tap()
+        XCTAssertTrue(app.buttons["navigation.menu"].waitForExistence(timeout: 5))
+        openMenu(in: app)
         let saved = app.buttons[savedID]
         XCTAssertTrue(saved.waitForExistence(timeout: 5))
         saved.tap()
         XCTAssertTrue(fixtureBubble("learner-text", in: app).waitForExistence(timeout: 5))
-        app.buttons["conversation.settings"].tap()
+        openMenuDestination("menu.settings", in: app)
         XCTAssertTrue(back.waitForExistence(timeout: 5))
         XCTAssertEqual(app.buttons["settings.tone.formal"].value as? String, "已选择")
         XCTAssertEqual(app.buttons["settings.replyLength.brief"].value as? String, "已选择")

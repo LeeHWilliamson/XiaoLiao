@@ -76,3 +76,16 @@ The row uses the design's 77-point green rounded surface and original paired wav
 References: [`24:89`](https://www.figma.com/design/jVSZ8R37YkVCJOC32lLmMR/project_V2?node-id=24-89), [`24:189`](https://www.figma.com/design/jVSZ8R37YkVCJOC32lLmMR/project_V2?node-id=24-189), and [`24:236`](https://www.figma.com/design/jVSZ8R37YkVCJOC32lLmMR/project_V2?node-id=24-236). New named colors are `SystemRequest` (`#C4F3FE`), `SystemResponse` (`#4C75E1`), and `SystemRequestText` (`#202020`). No new image exports are required.
 
 The composer reuses VoiceModeGlyph/ControlRing at 64 points in voice mode and 53 points in text mode. The armed composer uses the light-blue fill and retains Figma's “联系推荐人” placeholder; its microphone is dimmed/unavailable. User requests reuse TextTail at 17.2822 × 23.3026, rotated 150 degrees at the lower right. System replies have no tail and use a four-point white border. Both bubbles retain 20-point corners, 225-point maximum width, 147-point minimum height, and scaled 24-point system text. The paper texture and all normal-message artwork remain unchanged. Mock replies append a visible “本地示例” marker so canned content is identified; screenshot/device comparison remains pending.
+
+## Unified menu navigation — 2026-10-29
+
+Source: [navigation frame 41:644](https://www.figma.com/design/jVSZ8R37YkVCJOC32lLmMR/project_V2?node-id=41-644), sidebar 41:710, and the updated New Conversation menu layers. Read through the Figma design-to-code/SwiftUI workflow. The panel is native layout/text with centralized design colors; the frame screenshot and underlying New Conversation content are not shipped as menu assets. The system gearshape replaces the design’s gear emoji by explicit user preference; ＋, ▤ and › remain the supplied typographic glyphs.
+
+| Asset | Source node | Export dimensions | App placement |
+| --- | --- | --- | --- |
+| MenuRing | `34:414` | 64 × 64 | Single header menu control; new red outline, distinct from brown ControlRing |
+| MenuGlyph | `34:416` | 32.001 × 19.6759 | Closed-menu hamburger glyph, centered over MenuRing |
+| MenuOpenRing | `41:655` | 64 × 64 | Filled-red close-menu control outside the panel |
+| MenuOpenGlyph | `41:657` | 32.001 × 19.6759 | Cream hamburger glyph, centered over MenuOpenRing |
+
+All four original SVG exports were downloaded and converted to vector PDFs with the same librsvg/Cairo process, unchanged viewport dimensions and paths. Asset catalogs retain vector representations. Their original 59.16098-point ring layer plus its 4.09% export margins maps to the 64-point rendered ring; glyphs keep their original proportions and native size. No temporary Figma URL appears at runtime. Existing brown composer/message controls, PaperTexture, dashboard colors/charts and other artwork are unchanged. Source/project/asset checks do not replace Xcode rendering comparison.

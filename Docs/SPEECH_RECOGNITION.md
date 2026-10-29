@@ -1,10 +1,10 @@
 # On-device recorded English transcription
 
-This increment connects newly sent recordings and recorded replacements to the same partner-reply, grammar, and local statistics pipelines as written messages. Existing recordings remain untouched unless the user records a new replacement. It does not implement live word-by-word captions, transcription editing, translation, partner speech synthesis, pronunciation scoring, or a new recording/review screen.
+This increment connects newly sent recordings and recorded replacements to the same partner-reply, grammar, and local statistics pipelines as written messages. Existing recordings remain untouched unless the user records a new replacement. It does not implement live word-by-word captions, transcription editing, translation, pronunciation scoring, or a new recording/review screen.
 
-## Try it on your physical iPhone
+## Try it on your physical iPhone or iPad
 
-Use a physical iPhone running **iOS 26.5 or later**, matching the unchanged deployment target. The MacBook remains suitable for development/playback, but microphone playback alone does not establish that a simulator supports Apple's speech models.
+Use a physical iPhone or iPad running **iOS/iPadOS 26.5 or later**, matching the unchanged deployment target. The MacBook remains suitable for development/playback, but microphone playback alone does not establish that a simulator supports Apple's speech models.
 
 1. Sync the updated repository to your Mac and build the app in Xcode. Select your connected iPhone as the Run destination and use the existing signing configuration.
 2. Keep the working Debug Run `XIAOLIAO_API_TOKEN` environment variable and launch from Xcode. This client-only feature needs **no Cloudflare redeployment or new secret**, assuming the already working conversation and grammar endpoints remain deployed.
@@ -38,3 +38,22 @@ Ten injected speech-pipeline XCTest cases cover identity/counting, audio/playbac
 This workspace has no Apple SDK, so actual Swift compilation, Speech framework execution, model installation, audio accuracy, physical-device playback, and SwiftUI rendering must be checked on the Mac/iPhone. Keep the prior user-reported microphone/playback and live grammar successes separate from acceptance of this new transcription feature.
 
 Official Apple references: [SpeechAnalyzer and recorded-file transcription](https://developer.apple.com/documentation/speech/speechanalyzer), [SpeechTranscriber availability](https://developer.apple.com/documentation/speech/speechtranscriber), [local DictationTranscriber](https://developer.apple.com/documentation/speech/dictationtranscriber), [model assets](https://developer.apple.com/documentation/speech/assetinventory), [permission requirements](https://developer.apple.com/documentation/speech/asking-permission-to-use-speech-recognition), [WWDC implementation overview](https://developer.apple.com/videos/play/wwdc2025/277/).
+
+## Partner reply playback
+
+The Apple built-in voice follow-up reads complete partner **text** replies aloud on demand. Select the partner bubble and tap its existing Play action. Tap again to pause, then again to resume. Once finished, Play starts the reply again. Replies do not autoplay. Existing saved partner text replies work too; the original fixture audio without a recording remains unavailable.
+
+Speech uses `AVSpeechSynthesizer`, the system `en-US` voice and default speech rate. It shares the controller/audio session with real recording playback, without creating or persisting a synthesized audio file. It does not change the reply's ID, written modality, content, timestamp, statistics or history. No new permission, backend deployment, secret, or paid speech endpoint is required. If no English voice is available, the existing audio alert explains the failure; the text remains readable.
+
+On the physical iPhone/iPad, check:
+
+1. Select a live partner text reply, tap Play, pause mid-sentence, resume, let it finish, then replay. The existing action highlights while active and VoiceOver labels it “暂停播放”. The original text bubble stays visible; no recording duration or fake progress card is added.
+2. Play a different reply while speech is active. Only the new reply should speak. Preview/play a learner recording and then play a partner reply; these audio sources must replace each other.
+3. Start recording during partner speech. Speech must stop before microphone permission/recording, and must not resume when recording ends. Review/Pause/Send and learner recording playback must still work. Partner Play remains unavailable while a recording draft exists.
+4. While speech is active or paused, open history/settings/statistics, switch conversations, or background/lock the app. Speech must stop. Also check an incoming audio interruption and headphone disconnection. Returning must not resume it automatically.
+5. Blue system exchanges stay text-only; typed learner messages do not gain synthesized playback. Repeat playback and reopening history must not create messages/edits or change practice statistics. A failed voice/audio-session attempt must retain the reply and permit another tap to retry.
+6. Check speaker and headphones, offline playback with an available English voice, larger Dynamic Type, and VoiceOver action/selection announcements. Voice availability and voice quality depend on the device/system voice assets.
+
+Two focused XCTest cases cover saved-text/history eligibility, exclusions for system/learner/unfinished messages, and blocking playback during a microphone request without invoking native speech. The live-reply test also checks Play availability and absence of automatic playback or fabricated recording data. Actual synthesis, pause/resume, audio routing and lifecycle checks require Xcode and physical hardware; these tests do not replace them.
+
+Apple references: [AVSpeechSynthesizer](https://developer.apple.com/documentation/avfaudio/avspeechsynthesizer), [application audio-session ownership](https://developer.apple.com/documentation/avfaudio/avspeechsynthesizer/usesapplicationaudiosession), [speech delegate lifecycle](https://developer.apple.com/documentation/avfaudio/avspeechsynthesizerdelegate).

@@ -2,7 +2,7 @@ import SwiftUI
 
 struct ConversationSettingsView: View {
     @Bindable var viewModel: ConversationViewModel
-    let onBack: () -> Void
+    let onMenu: () -> Void
     @ScaledMetric(relativeTo: .largeTitle) private var titleSize: CGFloat = 36
 
     var body: some View {
@@ -13,8 +13,7 @@ struct ConversationSettingsView: View {
                         .font(.system(size: titleSize))
                         .accessibilityAddTraits(.isHeader)
                     HStack {
-                        ArtworkButton(label: "返回", glyph: .backGlyph, ring: .backRing, action: onBack)
-                            .accessibilityIdentifier("settings.back")
+                        NavigationMenuButton(action: onMenu)
                         Spacer()
                     }
                 }

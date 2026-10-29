@@ -8,9 +8,13 @@ The user confirmed live grammar statistics work for **new typed practice message
 
 On-device English recognition is now implemented for newly sent recordings and recorded replacements. It preserves the audio, attaches a transcript to the same spoken message, and connects that text to replies, grammar, and local statistics without double-counting the message. Build and test this client update on a supported physical iPhone; [speech setup and checks](Docs/SPEECH_RECOGNITION.md) cover model downloads, retry, relaunch, and limitations. No speech backend redeployment is needed.
 
-The OpenAI key stays in Cloudflare. Private Debug runs use a separate beta token; Release builds do not embed shared credentials. Tests/previews retain isolated offline fixtures. Partner audio synthesis, pronunciation scoring, clause/vocabulary judgment, and production account authentication remain future work.
+Navigation now uses one red menu button across conversation, settings and statistics screens. The Figma navy drawer combines 开始新对话, 学习进度, Conversation Settings and saved history. Per-conversation statistics controls remain unavailable. The overall dashboard content is unchanged; its header opens the same menu.
 
-Committed learner text and text edits receive automatic local word/sentence analysis. Open the stats icon on either conversation screen to see overall grammar results, sentence totals, newly observed vocabulary, and vocabulary diversity (MATTR). Grammar stays unknown until its actual analysis succeeds; clause metrics remain unavailable.
+Partner text replies now support on-demand English playback using Apple’s built-in voice. Select a reply and tap Play; tap again to pause/resume, or replay after it finishes. Recording or leaving the feed stops playback. Blue system replies stay text-only. This client update needs no Cloudflare deployment or new key; actual voice playback still needs device testing. See [speech checks](Docs/SPEECH_RECOGNITION.md#partner-reply-playback).
+
+The OpenAI key stays in Cloudflare. Private Debug runs use a separate beta token; Release builds do not embed shared credentials. Tests/previews retain isolated offline fixtures. Pronunciation scoring, cloud-generated partner voices, clause/vocabulary judgment, and production account authentication remain future work.
+
+Committed learner text and text edits receive automatic local word/sentence analysis. Open the menu and choose 学习进度 to see overall grammar results, sentence totals, newly observed vocabulary, and vocabulary diversity (MATTR). Grammar stays unknown until its actual analysis succeeds; clause metrics remain unavailable.
 
 - Every submitted original and edit counts as a complete practice attempt.
 - Word forms such as `run`, `runs`, and `running` count separately; capitalization is normalized.

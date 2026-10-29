@@ -52,32 +52,28 @@ struct ArtworkButton: View {
 
 /// This is custom artwork in Figma, rather than a standard titled navigation bar.
 struct ConversationHeader: View {
-    var onHistory: (() -> Void)?
-    var onSettings: (() -> Void)?
-    var onStatistics: (() -> Void)?
+    let onMenu: () -> Void
 
     var body: some View {
         HStack {
-            ArtworkButton(
-                label: "以前的对话",
-                glyph: .historyGlyph,
-                isAvailable: onHistory != nil,
-                action: { onHistory?() }
-            )
-            .accessibilityIdentifier("conversation.history")
+            NavigationMenuButton(action: onMenu)
             Spacer()
-            ArtworkButton(label: "全部学习统计", glyph: .statsGlyph, isAvailable: onStatistics != nil) {
-                onStatistics?()
-            }
-            .accessibilityIdentifier("conversation.statistics")
-            Spacer()
-            ArtworkButton(label: "对话设置", glyph: .settingsGlyph, isAvailable: onSettings != nil) {
-                onSettings?()
-            }
-            .accessibilityIdentifier("conversation.settings")
         }
         .padding(.horizontal, 28)
         .padding(.top, 8)
         .padding(.bottom, 8)
+    }
+}
+
+struct NavigationMenuButton: View {
+    var isExpanded = false
+    let action: () -> Void
+
+    var body: some View {
+        ArtworkButton(label: isExpanded ? "关闭菜单" : "打开菜单",
+                      glyph: isExpanded ? .menuOpenGlyph : .menuGlyph,
+                      ring: isExpanded ? .menuOpenRing : .menuRing, action: action)
+            .accessibilityValue(isExpanded ? "已展开" : "已收起")
+            .accessibilityIdentifier(isExpanded ? "menu.close" : "navigation.menu")
     }
 }

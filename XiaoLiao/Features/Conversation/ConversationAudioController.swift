@@ -12,7 +12,7 @@ nonisolated struct LocalAudioClip: Equatable, Sendable {
 
 @MainActor
 @Observable
-final class ConversationAudioController: NSObject, AVAudioRecorderDelegate, AVAudioPlayerDelegate {
+final class ConversationAudioController: NSObject, AVAudioRecorderDelegate, AVAudioPlayerDelegate, AVSpeechSynthesizerDelegate {
     enum RecordingState: Equatable {
         case idle, requestingPermission, recording, processing, review
     }
@@ -33,6 +33,8 @@ final class ConversationAudioController: NSObject, AVAudioRecorderDelegate, AVAu
 
     @ObservationIgnored private var recorder: AVAudioRecorder?
     @ObservationIgnored private var player: AVAudioPlayer?
+    @ObservationIgnored private var speechSynthesizer: AVSpeechSynthesizer?
+    @ObservationIgnored private var speechUtterance: AVSpeechUtterance?
     @ObservationIgnored private var currentSegment: URL?
     @ObservationIgnored private var segments: [URL] = []
     @ObservationIgnored private var completedDuration: TimeInterval = 0
@@ -235,7 +237,56 @@ final class ConversationAudioController: NSObject, AVAudioRecorderDelegate, AVAu
         } catch { failPlayback() }
     }
 
+    /// Read partner text on demand without creating an audio message or recording.
+    /// Speech shares the same playback identity/session as saved clips, so the
+    /// existing recording, navigation and interruption paths stop both sources.
+    func toggleSpeech(_ text: String, id: String) {
+        guard recordingState == .idle else { return }
+        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        issue = nil
+        if playbackID == id, let speechSynthesizer, speechUtterance != nil {
+            if isPlaying {
+                guard speechSynthesizer.pauseSpeaking(at: .immediate) else { failSpeech(); return }
+                isPlaying = false
+                deactivateSession()
+            } else {
+                do {
+                    try activatePlayback()
+                    guard speechSynthesizer.continueSpeaking() else { throw AudioFailure.playback }
+                    isPlaying = true
+                } catch { failSpeech() }
+            }
+            return
+        }
+        stopPlayback()
+        guard let voice = AVSpeechSynthesisVoice(language: "en-US") else {
+            issue = Issue(message: "英语朗读声音暂不可用。请在系统设置的辅助功能朗读设置中检查英语声音，然后重试。")
+            return
+        }
+        do {
+            try activatePlayback()
+            let utterance = AVSpeechUtterance(string: text)
+            utterance.voice = voice
+            utterance.rate = AVSpeechUtteranceDefaultSpeechRate
+            let synthesizer = AVSpeechSynthesizer()
+            synthesizer.usesApplicationAudioSession = true
+            synthesizer.delegate = self
+            speechSynthesizer = synthesizer
+            speechUtterance = utterance
+            playbackID = id
+            isPlaying = true
+            synthesizer.speak(utterance)
+        } catch { failSpeech() }
+    }
+
     func stopPlayback() {
+        // Invalidate identity before stopping; late delegate callbacks must not
+        // clear a newer recording, saved-clip playback or spoken reply.
+        speechUtterance = nil
+        speechSynthesizer?.delegate = nil
+        speechSynthesizer?.stopSpeaking(at: .immediate)
+        speechSynthesizer = nil
         player?.delegate = nil
         player?.stop()
         player = nil
@@ -273,6 +324,11 @@ final class ConversationAudioController: NSObject, AVAudioRecorderDelegate, AVAu
     private func failPlayback() {
         stopPlayback()
         issue = Issue(message: "无法播放这段录音。请检查音频输出或重新录制。")
+    }
+
+    private func failSpeech() {
+        stopPlayback()
+        issue = Issue(message: "无法朗读这条回复。请检查音频输出，然后轻点播放重试。文字回复仍已保留。")
     }
 
     private func startMeter() {
@@ -319,6 +375,27 @@ final class ConversationAudioController: NSObject, AVAudioRecorderDelegate, AVAu
         Task { @MainActor [weak self] in
             guard let self, let current = self.player, ObjectIdentifier(current) == identity else { return }
             failPlayback()
+        }
+    }
+
+    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
+        let identity = ObjectIdentifier(utterance)
+        Task { @MainActor [weak self] in
+            guard let self, let current = self.speechUtterance, ObjectIdentifier(current) == identity else { return }
+            speechUtterance = nil
+            speechSynthesizer?.delegate = nil
+            speechSynthesizer = nil
+            isPlaying = false
+            playbackProgress = 1
+            deactivateSession()
+        }
+    }
+
+    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
+        let identity = ObjectIdentifier(utterance)
+        Task { @MainActor [weak self] in
+            guard let self, let current = self.speechUtterance, ObjectIdentifier(current) == identity else { return }
+            failSpeech()
         }
     }
 

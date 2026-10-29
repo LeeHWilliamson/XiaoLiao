@@ -6,7 +6,7 @@ struct ContentView: View {
     private enum Route: Hashable { case conversation, settings, statistics }
     @State private var path: [Route] = []
     @State private var conversation: ConversationViewModel
-    @State private var isHistoryPresented = false
+    @State private var isMenuPresented = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
 
@@ -17,25 +17,31 @@ struct ContentView: View {
     var body: some View {
         ZStack {
             navigation
-                .allowsHitTesting(!isHistoryPresented)
-                .accessibilityHidden(isHistoryPresented)
+                .allowsHitTesting(!isMenuPresented)
+                .accessibilityHidden(isMenuPresented)
 
-            if isHistoryPresented {
-                ConversationHistoryDrawer(
+            if isMenuPresented {
+                ConversationNavigationMenu(
                     sessions: conversation.history,
                     selectedSessionID: conversation.activeSessionID,
                     onSelect: { id in
                         if conversation.openConversation(id) {
                             path = [.conversation]
-                            dismissHistory()
+                            dismissMenu()
                         }
                     },
                     onNewConversation: {
-                        conversation.prepareNewConversation()
+                        // With menu-based navigation, this also returns from
+                        // settings/statistics to an unfinished new-chat draft.
+                        if conversation.activeSessionID != nil {
+                            conversation.prepareNewConversation()
+                        }
                         path = []
-                        dismissHistory()
+                        dismissMenu()
                     },
-                    onDismiss: dismissHistory
+                    onSettings: showSettings,
+                    onStatistics: showStatistics,
+                    onDismiss: dismissMenu
                 )
                 .transition(.move(edge: .leading))
             }
@@ -112,56 +118,54 @@ struct ContentView: View {
                         path = [.conversation]
                     }
                 },
-                onHistory: presentHistory,
-                onSettings: showSettings,
-                onStatistics: showStatistics
+                onMenu: presentMenu
             )
             .navigationDestination(for: Route.self) { route in
                 switch route {
                 case .conversation:
                     ConversationFeedView(
                         viewModel: conversation,
-                        onHistory: presentHistory,
-                        onSettings: showSettings,
-                        onStatistics: showStatistics
+                        onMenu: presentMenu
                     )
                 case .settings:
-                    ConversationSettingsView(viewModel: conversation) {
-                        if !path.isEmpty { path.removeLast() }
-                    }
+                    ConversationSettingsView(viewModel: conversation, onMenu: presentMenu)
                 case .statistics:
-                    StatisticsDashboardView(conversation: conversation) {
-                        if !path.isEmpty { path.removeLast() }
-                    }
+                    StatisticsDashboardView(conversation: conversation, onMenu: presentMenu)
                 }
             }
         }
     }
 
-    private func presentHistory() {
+    private func presentMenu() {
         conversation.leaveFeed()
         conversation.deselectMessage()
         withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.22)) {
-            isHistoryPresented = true
+            isMenuPresented = true
         }
     }
 
-    private func dismissHistory() {
+    private func dismissMenu() {
         withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.22)) {
-            isHistoryPresented = false
+            isMenuPresented = false
         }
     }
 
     private func showSettings() {
         conversation.leaveFeed()
         conversation.deselectMessage()
-        path.append(.settings)
+        if path.last != .settings {
+            path = conversation.activeSessionID == nil ? [.settings] : [.conversation, .settings]
+        }
+        dismissMenu()
     }
 
     private func showStatistics() {
         conversation.leaveFeed()
         conversation.deselectMessage()
-        path.append(.statistics)
+        if path.last != .statistics {
+            path = conversation.activeSessionID == nil ? [.statistics] : [.conversation, .statistics]
+        }
+        dismissMenu()
     }
 }
 

@@ -4,6 +4,10 @@ import SwiftUI
 enum FigmaArtwork: String, CaseIterable {
     case paperTexture = "PaperTexture"
     case controlRing = "ControlRing"
+    case menuRing = "MenuRing"
+    case menuGlyph = "MenuGlyph"
+    case menuOpenRing = "MenuOpenRing"
+    case menuOpenGlyph = "MenuOpenGlyph"
     case historyGlyph = "HistoryGlyph"
     case statsGlyph = "StatsGlyph"
     case settingsGlyph = "SettingsGlyph"
@@ -41,6 +45,8 @@ enum FigmaArtwork: String, CaseIterable {
         switch self {
         case .paperTexture: CGSize(width: 1024, height: 1024)
         case .controlRing: CGSize(width: 64, height: 64)
+        case .menuRing, .menuOpenRing: CGSize(width: 64, height: 64)
+        case .menuGlyph, .menuOpenGlyph: CGSize(width: 32.001, height: 19.6759)
         case .historyGlyph: CGSize(width: 32.0007, height: 32.0007)
         case .statsGlyph: CGSize(width: 31.9977, height: 31.9977)
         case .settingsGlyph: CGSize(width: 32.001, height: 32.001)

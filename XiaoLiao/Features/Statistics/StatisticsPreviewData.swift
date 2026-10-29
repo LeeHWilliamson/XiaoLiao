@@ -58,12 +58,12 @@ enum StatisticsPreviewData {
 }
 
 #Preview("全部统计 · 示例数据") {
-    StatisticsDashboardView(conversation: ConversationViewModel(history: StatisticsPreviewData.sessions), onBack: {})
+    StatisticsDashboardView(conversation: ConversationViewModel(history: StatisticsPreviewData.sessions), onMenu: {})
         .preferredColorScheme(.light)
 }
 
 #Preview("全部统计 · 无分析数据") {
-    StatisticsDashboardView(conversation: ConversationViewModel(history: []), onBack: {})
+    StatisticsDashboardView(conversation: ConversationViewModel(history: []), onMenu: {})
         .preferredColorScheme(.light)
 }
 #endif

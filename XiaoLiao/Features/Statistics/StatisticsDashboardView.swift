@@ -3,23 +3,22 @@ import Charts
 
 struct StatisticsDashboardView: View {
     let conversation: ConversationViewModel
-    let onBack: () -> Void
+    let onMenu: () -> Void
     @State private var dashboard: StatisticsDashboardModel
     @Environment(\.scenePhase) private var scenePhase
     @ScaledMetric(relativeTo: .largeTitle) private var titleSize: CGFloat = 34
     @ScaledMetric(relativeTo: .body) private var chartHeight: CGFloat = 235
 
-    init(conversation: ConversationViewModel, onBack: @escaping () -> Void) {
+    init(conversation: ConversationViewModel, onMenu: @escaping () -> Void) {
         self.conversation = conversation
-        self.onBack = onBack
+        self.onMenu = onMenu
         _dashboard = State(initialValue: StatisticsDashboardModel())
     }
 
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 16) {
-                ArtworkButton(label: "返回", glyph: .backGlyph, ring: .backRing, action: onBack)
-                    .accessibilityIdentifier("stats.back")
+                NavigationMenuButton(action: onMenu)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("学习统计")
                         .font(.system(size: titleSize, weight: .bold))

@@ -3,9 +3,7 @@ import SwiftUI
 struct NewConversationView: View {
     @Bindable var viewModel: ConversationViewModel
     let onStart: () -> Void
-    let onHistory: () -> Void
-    let onSettings: () -> Void
-    let onStatistics: () -> Void
+    let onMenu: () -> Void
     @FocusState private var isPromptFocused: Bool
     @ScaledMetric(relativeTo: .largeTitle) private var titleSize: CGFloat = 48
     @ScaledMetric(relativeTo: .largeTitle) private var subtitleSize: CGFloat = 36
@@ -15,20 +13,10 @@ struct NewConversationView: View {
         GeometryReader { geometry in
             ScrollView {
                 VStack(spacing: 0) {
-                    ConversationHeader(
-                        onHistory: {
-                            isPromptFocused = false
-                            onHistory()
-                        },
-                        onSettings: {
-                            isPromptFocused = false
-                            onSettings()
-                        },
-                        onStatistics: {
-                            isPromptFocused = false
-                            onStatistics()
-                        }
-                    )
+                    ConversationHeader {
+                        isPromptFocused = false
+                        onMenu()
+                    }
 
                     Text("小聊")
                         .font(.system(size: titleSize, weight: .bold))

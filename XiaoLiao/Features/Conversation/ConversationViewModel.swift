@@ -235,7 +235,7 @@ final class ConversationViewModel {
         case .edit: return !isSystemMessageMode && canEditMessage(message.id)
         case .translate: return translation(for: message) != nil
         case .play:
-            return audioClip(for: message) != nil
+            return audioClip(for: message) != nil || partnerSpeechText(for: message) != nil
         case .repeatAudio: return false // Regeneration requires future service integration.
         }
     }
@@ -264,12 +264,23 @@ final class ConversationViewModel {
                 inputMode = .text
             }
         case .play:
-            guard let clip = audioClip(for: message) else { return }
-            details[id] = .playback
-            audio.togglePlayback(clip, id: id)
+            if let clip = audioClip(for: message) {
+                details[id] = .playback
+                audio.togglePlayback(clip, id: id)
+            } else if let text = partnerSpeechText(for: message) {
+                details[id] = nil
+                audio.toggleSpeech(text, id: id)
+            }
         case .repeatAudio:
             break
         }
+    }
+
+    private func partnerSpeechText(for message: Message) -> String? {
+        guard message.senderRole == .aiPartner, message.purpose == .conversationPractice,
+              message.status == .complete, case let .text(text) = message.content,
+              !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        return text
     }
 
     func detailText(for message: Message) -> String? {

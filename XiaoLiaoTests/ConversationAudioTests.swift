@@ -4,6 +4,63 @@ import XCTest
 
 final class ConversationAudioTests: XCTestCase {
     @MainActor
+    func testPartnerSpeechAvailabilitySurvivesHistoryAndKeepsSystemAndLearnerTextSilent() throws {
+        let id = "speech-session"
+        let partner = Message(conversationID: id, senderRole: .aiPartner, modality: .written,
+                              content: .text("What do you like about tea?"), origin: .fixture)
+        let learner = Message(conversationID: id, senderRole: .user, modality: .written,
+                              content: .text("I like green tea."), origin: .fixture)
+        let system = Message(conversationID: id, senderRole: .system, purpose: .systemAssistance,
+                             modality: .written, content: .text("已调整对话设置。"), origin: .fixture)
+        let unfinished = Message(conversationID: id, senderRole: .aiPartner, modality: .written,
+                                 content: .text("An unfinished reply"), status: .failed, origin: .fixture)
+        let session = ConversationSession(id: id, title: "Tea", prompt: "Talk about tea",
+                                          messages: [partner, learner, system, unfinished], settings: .init())
+        // Old text replies need no audio-file migration, transcription or paid work.
+        let restored = try JSONDecoder().decode(ConversationSession.self, from: JSONEncoder().encode(session))
+        let model = ConversationViewModel(history: [restored])
+        XCTAssertTrue(model.openConversation(id))
+        XCTAssertTrue(model.isAvailable(.play, for: partner))
+        for message in [learner, system, unfinished] {
+            XCTAssertFalse(model.isAvailable(.play, for: message))
+            model.selectMessage(message.id)
+            model.perform(.play, on: message.id)
+            XCTAssertNil(model.audio.playbackID)
+        }
+        XCTAssertEqual(model.messageVersions, session.messages)
+        XCTAssertNil(model.audioClip(for: partner))
+        model.prepareNewConversation()
+        XCTAssertFalse(model.isAvailable(.play, for: partner))
+        XCTAssertTrue(model.openConversation(id))
+        XCTAssertTrue(model.isAvailable(.play, for: partner))
+        XCTAssertEqual(model.messageVersions, session.messages)
+        XCTAssertFalse(model.audio.isPlaying)
+    }
+
+    @MainActor
+    func testMicrophoneRequestBlocksPartnerSpeechAndDenialRestoresPlaybackAction() async {
+        let id = "speech-recording-session"
+        let partner = Message(conversationID: id, senderRole: .aiPartner, modality: .written,
+                              content: .text("Tell me about your day."), origin: .fixture)
+        let session = ConversationSession(id: id, title: "Today", prompt: "Talk about today",
+                                          messages: [partner], settings: .init())
+        let audio = ConversationAudioController(permissionRequest: { false })
+        let model = ConversationViewModel(history: [session], audio: audio)
+        XCTAssertTrue(model.openConversation(id))
+        model.selectMessage(partner.id)
+        XCTAssertTrue(model.isAvailable(.play, for: partner))
+        let request = audio.startRecording()
+        XCTAssertEqual(audio.recordingState, .requestingPermission)
+        XCTAssertFalse(model.isAvailable(.play, for: partner))
+        model.perform(.play, on: partner.id)
+        XCTAssertFalse(audio.isPlaying)
+        XCTAssertNil(audio.playbackID)
+        await request?.value
+        XCTAssertTrue(model.isAvailable(.play, for: partner))
+        XCTAssertEqual(model.messageVersions, [partner])
+    }
+
+    @MainActor
     func testMicrophoneDenialReturnsToIdleAndOffersSettings() async {
         let audio = ConversationAudioController(permissionRequest: { false })
         let request = audio.startRecording()
