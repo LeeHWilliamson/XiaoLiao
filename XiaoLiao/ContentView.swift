@@ -7,8 +7,10 @@ struct ContentView: View {
     @State private var path: [Route] = []
     @State private var conversation: ConversationViewModel
     @State private var isMenuPresented = false
+    @AppStorage(AppLanguage.preferenceKey) private var gradingMode = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
+    private var strings: AppStrings { AppStrings(isEnglish: gradingMode) }
 
     init(viewModel: ConversationViewModel) {
         _conversation = State(initialValue: viewModel)
@@ -47,13 +49,15 @@ struct ContentView: View {
             }
         }
         // The supplied Figma frames define a light-only brand palette.
+        .environment(\.appStrings, strings)
+        .environment(\.locale, strings.locale)
         .preferredColorScheme(.light)
-        .alert("本地历史", isPresented: Binding(
+        .alert(strings("本地历史"), isPresented: Binding(
             get: { conversation.storageIssue != nil },
             set: { if !$0 { conversation.storageIssue = nil } }
         )) {
             if conversation.storageIssue?.canRetryLoading == true {
-                Button("重试读取") {
+                Button(strings("重试读取")) {
                     conversation.storageIssue = nil
                     Task { @MainActor in
                         await Task.yield()
@@ -61,17 +65,17 @@ struct ContentView: View {
                     }
                 }
             }
-            Button("好", role: .cancel) { conversation.storageIssue = nil }
+            Button(strings("好"), role: .cancel) { conversation.storageIssue = nil }
         } message: {
-            Text(conversation.storageIssue?.message ?? "")
+            Text(strings.error(conversation.storageIssue?.message ?? ""))
         }
-        .alert("对话", isPresented: Binding(
+        .alert(strings("对话"), isPresented: Binding(
             get: { conversation.replyIssue != nil },
             set: { if !$0 { conversation.replyIssue = nil } }
         )) {
-            Button("好", role: .cancel) { conversation.replyIssue = nil }
+            Button(strings("好"), role: .cancel) { conversation.replyIssue = nil }
         } message: {
-            Text(conversation.replyIssue ?? "")
+            Text(strings.error(conversation.replyIssue ?? ""))
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .background {

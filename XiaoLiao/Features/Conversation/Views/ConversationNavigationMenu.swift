@@ -2,6 +2,7 @@ import SwiftUI
 
 /// Figma 41:644 / 41:710: global navigation and local history in one drawer.
 struct ConversationNavigationMenu: View {
+    @Environment(\.appStrings) private var strings
     let sessions: [ConversationSession]
     let selectedSessionID: String?
     let onSelect: (String) -> Void
@@ -26,7 +27,7 @@ struct ConversationNavigationMenu: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("关闭菜单")
+                .accessibilityLabel(strings("关闭菜单"))
                 .accessibilityIdentifier("menu.scrim")
 
                 HStack(alignment: .top, spacing: 12) {
@@ -79,11 +80,11 @@ struct ConversationNavigationMenu: View {
         VStack(spacing: 20) {
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("小聊")
+                    Text(strings("小聊"))
                         .font(.system(size: brandSize, weight: .bold))
                         .accessibilityAddTraits(.isHeader)
                         .accessibilityFocused($isTitleFocused)
-                    Text("你的英语学习伙伴")
+                    Text(strings("你的英语学习伙伴"))
                         .font(.subheadline)
                         .foregroundStyle(Palette.secondary)
                 }
@@ -97,7 +98,7 @@ struct ConversationNavigationMenu: View {
                         .background(Palette.control, in: RoundedRectangle(cornerRadius: 14))
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("对话设置")
+                .accessibilityLabel(strings("对话设置"))
                 .accessibilityIdentifier("menu.settings")
             }
             .padding(.horizontal, 4)
@@ -107,7 +108,7 @@ struct ConversationNavigationMenu: View {
                 HStack(spacing: 16) {
                     Text("＋").font(.title)
                         .accessibilityHidden(true)
-                    Text("开始新对话")
+                    Text(strings("开始新对话"))
                         .font(.system(size: actionSize, weight: .bold))
                     Spacer(minLength: 0)
                 }
@@ -127,9 +128,9 @@ struct ConversationNavigationMenu: View {
                         .foregroundStyle(Palette.progressGlyph)
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 14) {
-                        Text("学习进度")
+                        Text(strings("学习进度"))
                             .font(.system(size: actionSize, weight: .bold))
-                        Text("看看你的英语进步")
+                        Text(strings("看看你的英语进步"))
                             .font(.footnote)
                             .foregroundStyle(Palette.progressSubtitle)
                     }
@@ -145,7 +146,7 @@ struct ConversationNavigationMenu: View {
                 .contentShape(RoundedRectangle(cornerRadius: 17))
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("学习进度，全部对话的学习统计")
+            .accessibilityLabel(strings("学习进度，全部对话的学习统计"))
             .accessibilityIdentifier("menu.statistics")
         }
         .padding(.horizontal, 20)
@@ -155,10 +156,10 @@ struct ConversationNavigationMenu: View {
     private var historyHeading: some View {
         VStack(spacing: 18) {
             HStack {
-                Text("以前的对话").font(.headline)
+                Text(strings("以前的对话")).font(.headline)
                     .accessibilityAddTraits(.isHeader)
                 Spacer(minLength: 8)
-                Text("最近").font(.system(size: captionSize))
+                Text(strings("最近")).font(.system(size: captionSize))
                     .foregroundStyle(Palette.secondary)
             }
             Rectangle().fill(Palette.divider).frame(height: 1)
@@ -196,7 +197,7 @@ struct ConversationNavigationMenu: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityValue(isSelected ? "已选择" : "")
+            .accessibilityValue(isSelected ? strings("已选择") : "")
             .accessibilityAddTraits(isSelected ? .isSelected : [])
             .accessibilityIdentifier("menu.session.\(session.id)")
 
@@ -211,8 +212,8 @@ struct ConversationNavigationMenu: View {
             }
             .buttonStyle(.plain)
             .disabled(true)
-            .accessibilityLabel("\(session.title)的对话统计")
-            .accessibilityHint("当前对话统计将在后续版本中提供")
+            .accessibilityLabel(strings("\(session.title)的对话统计"))
+            .accessibilityHint(strings("当前对话统计将在后续版本中提供"))
             .accessibilityIdentifier("menu.sessionStatistics.\(session.id)")
             .padding(.trailing, 7)
         }
@@ -229,14 +230,14 @@ struct ConversationNavigationMenu: View {
     private func historySubtitle(_ session: ConversationSession) -> String {
         // Use actual saved metadata; mockup dates/descriptions are not app data.
         guard let date = session.messages.last?.createdAt else { return session.prompt }
-        return date.formatted(.dateTime.month().day().locale(Locale(identifier: "zh_CN"))) + " · " + session.prompt
+        return date.formatted(.dateTime.month().day().locale(strings.locale)) + " · " + session.prompt
     }
 
     private var footer: some View {
         VStack(alignment: .leading, spacing: 12) {
             Rectangle().fill(Palette.divider).frame(height: 1)
                 .accessibilityHidden(true)
-            Text("轻松聊天，慢慢进步")
+            Text(strings("轻松聊天，慢慢进步"))
                 .font(.system(size: captionSize))
                 .foregroundStyle(Palette.secondary)
                 .padding(.horizontal, 5)

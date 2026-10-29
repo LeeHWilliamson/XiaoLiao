@@ -28,6 +28,7 @@ struct ArtworkIcon: View {
 }
 
 struct ArtworkButton: View {
+    @Environment(\.appStrings) private var strings
     let label: String
     let glyph: FigmaArtwork
     var ring: FigmaArtwork = .controlRing
@@ -45,8 +46,8 @@ struct ArtworkButton: View {
         }
         .buttonStyle(.plain)
         .disabled(!isAvailable)
-        .accessibilityLabel(label)
-        .accessibilityHint(isAvailable ? "" : unavailableHint)
+        .accessibilityLabel(strings(label))
+        .accessibilityHint(isAvailable ? "" : strings(unavailableHint))
     }
 }
 
@@ -66,14 +67,15 @@ struct ConversationHeader: View {
 }
 
 struct NavigationMenuButton: View {
+    @Environment(\.appStrings) private var strings
     var isExpanded = false
     let action: () -> Void
 
     var body: some View {
-        ArtworkButton(label: isExpanded ? "关闭菜单" : "打开菜单",
+        ArtworkButton(label: isExpanded ? strings("关闭菜单") : strings("打开菜单"),
                       glyph: isExpanded ? .menuOpenGlyph : .menuGlyph,
                       ring: isExpanded ? .menuOpenRing : .menuRing, action: action)
-            .accessibilityValue(isExpanded ? "已展开" : "已收起")
+            .accessibilityValue(isExpanded ? strings("已展开") : strings("已收起"))
             .accessibilityIdentifier(isExpanded ? "menu.close" : "navigation.menu")
     }
 }

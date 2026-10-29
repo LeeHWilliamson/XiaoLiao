@@ -2,6 +2,7 @@ import SwiftUI
 import Charts
 
 struct StatisticsDashboardView: View {
+    @Environment(\.appStrings) private var strings
     let conversation: ConversationViewModel
     let onMenu: () -> Void
     @State private var dashboard: StatisticsDashboardModel
@@ -20,10 +21,10 @@ struct StatisticsDashboardView: View {
             HStack(spacing: 16) {
                 NavigationMenuButton(action: onMenu)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("学习统计")
+                    Text(strings("学习统计"))
                         .font(.system(size: titleSize, weight: .bold))
                         .accessibilityAddTraits(.isHeader)
-                    Text("全部对话 · 累计学习记录").font(.subheadline)
+                    Text(strings("全部对话 · 累计学习记录")).font(.subheadline)
                 }
                 Spacer(minLength: 0)
             }
@@ -35,13 +36,13 @@ struct StatisticsDashboardView: View {
                 VStack(alignment: .leading, spacing: 24) {
                     switch dashboard.state {
                     case .loading:
-                        ProgressView("正在整理学习记录…")
+                        ProgressView(strings("正在整理学习记录…"))
                             .frame(maxWidth: .infinity, minHeight: 200)
                             .accessibilityIdentifier("stats.loading")
                     case .failed:
-                        StatisticsCard(title: "暂时无法读取统计") {
-                            Text("已有学习记录仍被保留，请稍后重试。")
-                            Button("重试") {
+                        StatisticsCard(title: strings("暂时无法读取统计")) {
+                            Text(strings("已有学习记录仍被保留，请稍后重试。"))
+                            Button(strings("重试")) {
                                 Task {
                                     conversation.retryLoadingHistory()
                                     await load()
@@ -85,7 +86,7 @@ struct StatisticsDashboardView: View {
     @ViewBuilder
     private func dashboardContent(_ snapshot: StatisticsSnapshot) -> some View {
         if snapshot.overall.textAnalyzedAttempts == 0 && snapshot.overall.grammarEvaluatedAttempts == 0 {
-            Text("暂时还没有学习分析数据。这里会展示全部对话的学习记录。")
+            Text(strings("暂时还没有学习分析数据。这里会展示全部对话的学习记录。"))
                 .font(.callout)
                 .padding(16)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -93,26 +94,26 @@ struct StatisticsDashboardView: View {
                 .accessibilityIdentifier("stats.empty")
         }
 
-        StatisticsCard(title: "语法", subtitle: "点击横条，查看该项的每日准确率") {
+        StatisticsCard(title: strings("语法"), subtitle: strings("点击横条，查看该项的每日准确率")) {
             GrammarProficiencyChart(metrics: dashboard.grammarMetrics, selection: $dashboard.selectedCategory)
-            Text("已评估 \(snapshot.overall.grammarEvaluatedAttempts) / \(snapshot.overall.practiceAttempts) 次练习；不确定的机会不计入准确率。")
+            Text(strings("已评估 \(snapshot.overall.grammarEvaluatedAttempts) / \(snapshot.overall.practiceAttempts) 次练习；不确定的机会不计入准确率。"))
                 .font(.caption)
-            Text("AI 语法分析 · 根据本条消息的上下文判断")
+            Text(strings("AI 语法分析 · 根据本条消息的上下文判断"))
                 .font(.caption)
             if conversation.pendingGrammarCount > 0 || conversation.failedGrammarCount > 0 {
-                Text("待分析 \(conversation.pendingGrammarCount) 条 · 未完成 \(conversation.failedGrammarCount) 条")
+                Text(strings("待分析 \(conversation.pendingGrammarCount) 条 · 未完成 \(conversation.failedGrammarCount) 条"))
                     .font(.caption)
                     .accessibilityIdentifier("stats.grammar.queue")
             }
             if let issue = conversation.grammarQueueIssue {
-                Text(issue).font(.callout)
+                Text(strings.error(issue)).font(.callout)
             } else if let failure = conversation.grammarFailureMessage {
-                Text(failure).font(.callout)
+                Text(strings.error(failure)).font(.callout)
             }
             if conversation.failedGrammarCount > 0 || conversation.grammarQueueIssue != nil {
-                Text("分析失败不会影响聊天，也不会计为语法错误。")
+                Text(strings("分析失败不会影响聊天，也不会计为语法错误。"))
                     .font(.caption)
-                Button("重试语法分析") { conversation.retryFailedGrammarEvaluations() }
+                Button(strings("重试语法分析")) { conversation.retryFailedGrammarEvaluations() }
                     .buttonStyle(.bordered)
                     .tint(XiaoLiaoTheme.ink)
                     .frame(minHeight: 44)
@@ -120,48 +121,48 @@ struct StatisticsDashboardView: View {
             }
         }
 
-        StatisticsCard(title: "\(dashboard.selectedCategory.title) · 趋势", subtitle: "每日正确机会 ÷ 当日已确定结果的机会") {
-            Text(dashboard.selectedMetric?.accuracy.map { "累计准确率 \($0.formatted(.percent.precision(.fractionLength(0))))" } ?? "尚无可用的评估结果")
+        StatisticsCard(title: strings("\(strings(dashboard.selectedCategory.title)) · 趋势"), subtitle: strings("每日正确机会 ÷ 当日已确定结果的机会")) {
+            Text(dashboard.selectedMetric?.accuracy.map { strings("累计准确率 \($0.formatted(.percent.precision(.fractionLength(0))))") } ?? strings("尚无可用的评估结果"))
                 .font(.subheadline.weight(.semibold))
             StatisticsLineChart(points: dashboard.grammarTrend, dates: dashboard.dateDomain, format: .accuracy,
-                                emptyMessage: "暂无该项的趋势数据", identifier: "stats.grammar.trend")
-                .accessibilityLabel("\(dashboard.selectedCategory.title)，每日准确率")
-            Text("\(dashboard.selectedCategory.title)每日准确率")
+                                emptyMessage: strings("暂无该项的趋势数据"), identifier: "stats.grammar.trend")
+                .accessibilityLabel(strings("\(strings(dashboard.selectedCategory.title))，每日准确率"))
+            Text(strings("\(strings(dashboard.selectedCategory.title))每日准确率"))
                 .font(.caption)
                 .accessibilityIdentifier("stats.grammar.selected")
         }
 
-        StatisticsCard(title: "词汇多样性", subtitle: "MATTR · 每日记录") {
-            Text(snapshot.overall.mattr.map { "累计 MATTR \($0.formatted(.number.precision(.fractionLength(2))))" } ?? "累计 MATTR —")
+        StatisticsCard(title: strings("词汇多样性"), subtitle: strings("MATTR · 每日记录")) {
+            Text(snapshot.overall.mattr.map { strings("累计 MATTR \($0.formatted(.number.precision(.fractionLength(2))))") } ?? strings("累计 MATTR —"))
                 .font(.subheadline.weight(.semibold))
             StatisticsLineChart(points: dashboard.vocabularyTrend, dates: dashboard.dateDomain, format: .diversity,
-                                emptyMessage: "词数足够时显示多样性趋势", identifier: "stats.vocabulary.diversity")
-            Text("每个窗口 \(snapshot.configuration.mattrWindowSize) 个词。当天已分析词数不足时不显示分数；重复使用的词仍计入。")
+                                emptyMessage: strings("词数足够时显示多样性趋势"), identifier: "stats.vocabulary.diversity")
+            Text(strings("每个窗口 \(snapshot.configuration.mattrWindowSize) 个词。当天已分析词数不足时不显示分数；重复使用的词仍计入。"))
                 .font(.caption)
         }
 
-        StatisticsCard(title: "新观察到的词汇", subtitle: "首次在你的练习中出现的词形 · 按日统计") {
+        StatisticsCard(title: strings("新观察到的词汇"), subtitle: strings("首次在你的练习中出现的词形 · 按日统计")) {
             vocabularyChart
-            Text("按首次使用时间记录，不代表刚刚学会。run、runs、running 分别统计。")
+            Text(strings("按首次使用时间记录，不代表刚刚学会。run、runs、running 分别统计。"))
                 .font(.caption)
         }
 
-        StatisticsCard(title: "练习量", subtitle: "已有分析的累计结果") {
+        StatisticsCard(title: strings("练习量"), subtitle: strings("已有分析的累计结果")) {
             activityTable(snapshot.overall)
-            Text("句子已分析 \(snapshot.overall.textAnalyzedAttempts) / \(snapshot.overall.practiceAttempts) 次练习；分句已分析 \(snapshot.overall.clauseAnalyzedAttempts) / \(snapshot.overall.practiceAttempts) 次。平均值仅使用有分句分析的句子。")
+            Text(strings("句子已分析 \(snapshot.overall.textAnalyzedAttempts) / \(snapshot.overall.practiceAttempts) 次练习；分句已分析 \(snapshot.overall.clauseAnalyzedAttempts) / \(snapshot.overall.practiceAttempts) 次。平均值仅使用有分句分析的句子。"))
                 .font(.caption)
-            Text("— 表示尚无分析结果。每次发送和编辑都计为一次练习。")
+            Text(strings("— 表示尚无分析结果。每次发送和编辑都计为一次练习。"))
                 .font(.caption)
         }
     }
 
     private var vocabularyChart: some View {
         Chart(dashboard.newVocabulary) { point in
-            BarMark(x: .value("日期", point.date, unit: .day), y: .value("新词数", point.count))
+            BarMark(x: .value(strings("日期"), point.date, unit: .day), y: .value(strings("新词数"), point.count))
                 .foregroundStyle(XiaoLiaoTheme.green)
                 .cornerRadius(4)
                 .accessibilityLabel(Text(point.date, format: .dateTime.year().month().day()))
-                .accessibilityValue(Text("\(point.count) 个新词"))
+                .accessibilityValue(Text(strings("\(point.count) 个新词")))
         }
         .chartXScale(domain: dashboard.dateDomain)
         .chartYScale(domain: 0...(dashboard.wordAxisTicks.last ?? 1))
@@ -177,27 +178,27 @@ struct StatisticsDashboardView: View {
                 AxisValueLabel()
             }
         }
-        .chartXAxisLabel("日期")
-        .chartYAxisLabel("词数")
+        .chartXAxisLabel(strings("日期"))
+        .chartYAxisLabel(strings("词数"))
         .frame(height: chartHeight)
         .overlay {
-            if dashboard.newVocabulary.isEmpty { chartEmptyMessage("暂无新词记录") }
+            if dashboard.newVocabulary.isEmpty { chartEmptyMessage(strings("暂无新词记录")) }
         }
-        .accessibilityLabel("每日新观察到的词汇数量")
+        .accessibilityLabel(strings("每日新观察到的词汇数量"))
         .accessibilityIdentifier("stats.vocabulary.new")
     }
 
     private func activityTable(_ statistics: PracticeStatistics) -> some View {
         Grid(alignment: .leading, horizontalSpacing: 20, verticalSpacing: 14) {
             GridRow {
-                Text("指标").frame(maxWidth: .infinity, alignment: .leading)
-                Text("数值")
+                Text(strings("指标")).frame(maxWidth: .infinity, alignment: .leading)
+                Text(strings("数值"))
             }
             .font(.subheadline.bold())
             Divider().overlay(XiaoLiaoTheme.ink.opacity(0.3)).gridCellColumns(2)
-            activityRow("句子数", value: statistics.sentenceCount.map { $0.formatted() } ?? "—", id: "sentences")
-            activityRow("分句数", value: statistics.clauseCount.map { $0.formatted() } ?? "—", id: "clauses")
-            activityRow("平均每句分句数", value: statistics.clausesPerSentence.map {
+            activityRow(strings("句子数"), value: statistics.sentenceCount.map { $0.formatted() } ?? "—", id: "sentences")
+            activityRow(strings("分句数"), value: statistics.clauseCount.map { $0.formatted() } ?? "—", id: "clauses")
+            activityRow(strings("平均每句分句数"), value: statistics.clausesPerSentence.map {
                 $0.formatted(.number.precision(.fractionLength(2)))
             } ?? "—", id: "clausesPerSentence")
         }
@@ -217,6 +218,7 @@ struct StatisticsDashboardView: View {
 /// Aligned native button rows form the horizontal chart. The whole bar row is a
 /// 44+ point target, including zero/missing values, with equivalent VoiceOver actions.
 private struct GrammarProficiencyChart: View {
+    @Environment(\.appStrings) private var strings
     let metrics: [GrammarMetricSummary]
     @Binding var selection: GrammarObservation.TrackedCategory
     @ScaledMetric(relativeTo: .subheadline) private var labelWidth: CGFloat = 84
@@ -232,7 +234,7 @@ private struct GrammarProficiencyChart: View {
                     ForEach(metrics, id: \.category.rawValue) { metric in
                         Button { selection = metric.category } label: {
                             HStack(spacing: 10) {
-                                Text(metric.category.title)
+                                Text(strings(metric.category.title))
                                     .font(.subheadline.weight(selection == metric.category ? .bold : .regular))
                                     .frame(width: labelWidth, alignment: .leading)
                                 GeometryReader { plot in
@@ -260,11 +262,11 @@ private struct GrammarProficiencyChart: View {
                             }
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel(metric.category.title)
+                        .accessibilityLabel(strings(metric.category.title))
                         .accessibilityValue(metric.accuracy.map {
-                            "准确率 \($0.formatted(.percent.precision(.fractionLength(0))))，\(metric.scoredOpportunities) 次机会"
-                        } ?? "暂无确定结果")
-                        .accessibilityHint("轻点查看这一项的准确率趋势")
+                            strings("准确率 \($0.formatted(.percent.precision(.fractionLength(0))))，\(metric.scoredOpportunities) 次机会")
+                        } ?? strings("暂无确定结果"))
+                        .accessibilityHint(strings("轻点查看这一项的准确率趋势"))
                         .accessibilityAddTraits(selection == metric.category ? .isSelected : [])
                         .accessibilityIdentifier("stats.grammar.category.\(metric.category.rawValue)")
                     }
@@ -283,7 +285,7 @@ private struct GrammarProficiencyChart: View {
                     .font(.caption2)
                     .padding(.horizontal, 4)
                     .padding(.top, 8)
-                    Text("准确率（%）").font(.caption).padding(.top, 4)
+                    Text(strings("准确率（%）")).font(.caption).padding(.top, 4)
                 }
                 .frame(width: max(geometry.size.width, labelWidth + valueWidth + minimumPlotWidth + 28))
             }
@@ -294,6 +296,7 @@ private struct GrammarProficiencyChart: View {
 }
 
 private struct StatisticsLineChart: View {
+    @Environment(\.appStrings) private var strings
     enum ValueFormat: Equatable {
         case accuracy, diversity
         var axisTitle: String { self == .accuracy ? "准确率" : "MATTR" }
@@ -311,13 +314,13 @@ private struct StatisticsLineChart: View {
 
     var body: some View {
         Chart(points) { point in
-            LineMark(x: .value("日期", point.date), y: .value(format.axisTitle, point.value),
-                     series: .value("连续记录", point.segment))
+            LineMark(x: .value(strings("日期"), point.date), y: .value(strings(format.axisTitle), point.value),
+                     series: .value(strings("连续记录"), point.segment))
                 .foregroundStyle(XiaoLiaoTheme.green)
                 .lineStyle(StrokeStyle(lineWidth: 3))
                 .interpolationMethod(.linear)
                 .accessibilityHidden(true)
-            PointMark(x: .value("日期", point.date), y: .value(format.axisTitle, point.value))
+            PointMark(x: .value(strings("日期"), point.date), y: .value(strings(format.axisTitle), point.value))
                 .foregroundStyle(XiaoLiaoTheme.green)
                 .symbolSize(40)
                 .accessibilityLabel(Text(point.date, format: .dateTime.year().month().day()))
@@ -338,8 +341,8 @@ private struct StatisticsLineChart: View {
                 AxisValueLabel { Text(format.label(value.as(Double.self) ?? 0)).font(.caption2) }
             }
         }
-        .chartXAxisLabel("日期")
-        .chartYAxisLabel(format.axisTitle)
+        .chartXAxisLabel(strings("日期"))
+        .chartYAxisLabel(strings(format.axisTitle))
         .frame(height: chartHeight)
         .overlay { if points.isEmpty { chartEmptyMessage(emptyMessage) } }
         .accessibilityIdentifier(identifier)

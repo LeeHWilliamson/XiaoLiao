@@ -6,6 +6,38 @@ final class ConversationFlowUITests: XCTestCase {
     }
 
     @MainActor
+    func testGradingModeChangesInterfaceImmediatelyAndSurvivesRelaunch() {
+        let app = XCUIApplication.isolatedHistoryApp()
+        app.launch()
+        app.buttons["conversation.suggest"].tap()
+        let originalPrompt = app.textViews["conversation.prompt"].value as? String
+        openMenuDestination("menu.settings", in: app)
+        let grading = app.switches["settings.gradingMode"]
+        XCTAssertTrue(grading.waitForExistence(timeout: 5))
+        XCTAssertEqual(grading.value as? String, "0")
+        grading.tap()
+        XCTAssertTrue(app.staticTexts["Conversation settings"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.buttons["settings.tone.casual"].value as? String, "Selected")
+        openMenuDestination("menu.statistics", in: app)
+        XCTAssertTrue(app.staticTexts["Learning statistics"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.buttons["stats.grammar.category.verb-tense"].label, "Verb tense")
+        returnToConversation(in: app)
+        XCTAssertEqual(app.buttons["conversation.start"].label, "Chat")
+        XCTAssertEqual(app.textViews["conversation.prompt"].value as? String, originalPrompt)
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(app.buttons["conversation.start"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.buttons["conversation.start"].label, "Chat")
+        openMenuDestination("menu.settings", in: app)
+        XCTAssertEqual(grading.value as? String, "1")
+        grading.tap()
+        XCTAssertTrue(app.staticTexts["对话设置"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.buttons["settings.tone.casual"].value as? String, "已选择")
+        returnToConversation(in: app)
+        XCTAssertEqual(app.buttons["conversation.start"].label, "聊天")
+    }
+
+    @MainActor
     func testVisibleSendButtonSubmitsTypedAndSystemMessagesWithoutReturn() {
         let app = XCUIApplication.isolatedHistoryApp()
         app.launch()
@@ -166,8 +198,8 @@ final class ConversationFlowUITests: XCTestCase {
     @MainActor
     private func returnToConversation(in app: XCUIApplication) {
         openMenu(in: app)
-        let selected = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND value == %@",
-                                                        "menu.session.", "已选择")).firstMatch
+        let selected = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND (value == %@ OR value == %@)",
+                                                        "menu.session.", "已选择", "Selected")).firstMatch
         if selected.exists {
             selected.tap()
         } else {
@@ -280,6 +312,7 @@ final class ConversationFlowUITests: XCTestCase {
         XCTAssertTrue(back.waitForExistence(timeout: 5))
         app.buttons["settings.tone.warm"].tap()
         app.buttons["settings.vocabulary.complex"].tap()
+        scrollTo(app.buttons["settings.replyLength.brief"], in: app)
         app.buttons["settings.replyLength.brief"].tap()
         returnToConversation(in: app)
         app.buttons["conversation.suggest"].tap()
@@ -340,6 +373,7 @@ final class ConversationFlowUITests: XCTestCase {
         let back = app.buttons["navigation.menu"]
         XCTAssertTrue(back.waitForExistence(timeout: 5))
         app.buttons["settings.tone.formal"].tap()
+        scrollTo(app.buttons["settings.replyLength.brief"], in: app)
         app.buttons["settings.replyLength.brief"].tap()
         returnToConversation(in: app)
         openMenu(in: app)

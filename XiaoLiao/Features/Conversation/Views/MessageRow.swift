@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct MessageRow: View {
+    @Environment(\.appStrings) private var strings
     let viewModel: ConversationViewModel
     let message: Message
     @ScaledMetric(relativeTo: .title3) private var messageSize: CGFloat = 20
@@ -17,7 +18,7 @@ struct MessageRow: View {
                 if message.senderRole == .aiPartner {
                     audioRow(duration: attachment.durationSeconds)
                 } else {
-                    textRow(text: message.transcription?.text ?? "语音消息 · \(durationLabel(attachment.durationSeconds))")
+                    textRow(text: message.transcription?.text ?? strings("语音消息 · \(durationLabel(attachment.durationSeconds))"))
                 }
             case let .text(text):
                 textRow(text: text)
@@ -26,7 +27,7 @@ struct MessageRow: View {
     }
 
     private func durationLabel(_ duration: TimeInterval?) -> String {
-        duration.map { "\(Int($0.rounded(.up)))秒" } ?? "时长未知"
+        duration.map { strings("\(Int($0.rounded(.up)))秒") } ?? strings("时长未知")
     }
 
     private func systemRow(text: String) -> some View {
@@ -55,7 +56,7 @@ struct MessageRow: View {
                     }
                 }
                 .frame(maxWidth: 225)
-                .accessibilityLabel("\(isResponse ? "小聊系统回复" : "我发给小聊系统的消息")：\(text)")
+                .accessibilityLabel("\(isResponse ? strings("小聊系统回复") : strings("我发给小聊系统的消息"))：\(text)")
                 .accessibilityIdentifier("message.\(message.logicalMessageID)")
             if isResponse { Spacer(minLength: 64) }
         }
@@ -75,7 +76,7 @@ struct MessageRow: View {
                             HStack(spacing: 22) {
                                 FigmaImage(artwork: .speakingGlyph)
                                     .frame(width: 51.19, height: 51.2245)
-                                Text(duration.map { "\(Int($0.rounded(.up))) sec" } ?? "语音")
+                                Text(duration.map { "\(Int($0.rounded(.up))) sec" } ?? strings("语音"))
                                     .font(.callout.bold())
                                     .foregroundStyle(Color(white: 146.0 / 255))
                             }
@@ -88,9 +89,9 @@ struct MessageRow: View {
                         }
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("对话伙伴的语音，\(durationLabel(duration))")
-                .accessibilityValue(isSelected ? "已选择" : "未选择")
-                .accessibilityHint("轻点显示或隐藏消息操作")
+                .accessibilityLabel(strings("对话伙伴的语音，\(durationLabel(duration))"))
+                .accessibilityValue(isSelected ? strings("已选择") : strings("未选择"))
+                .accessibilityHint(strings("轻点显示或隐藏消息操作"))
                 .accessibilityIdentifier("message.\(message.logicalMessageID)")
                 .overlay(alignment: .topTrailing) {
                     if isSelected {
@@ -137,9 +138,9 @@ struct MessageRow: View {
                         }
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("\(isPartner ? "对话伙伴的消息" : "我的消息")：\(text)")
-                .accessibilityValue(isSelected ? "已选择" : "未选择")
-                .accessibilityHint("轻点显示或隐藏消息操作")
+                .accessibilityLabel("\(isPartner ? strings("对话伙伴的消息") : strings("我的消息"))：\(text)")
+                .accessibilityValue(isSelected ? strings("已选择") : strings("未选择"))
+                .accessibilityHint(strings("轻点显示或隐藏消息操作"))
                 .accessibilityIdentifier("message.\(message.logicalMessageID)")
                 .overlay(alignment: isPartner ? .topTrailing : .topLeading) {
                     if isSelected {
@@ -162,7 +163,7 @@ struct MessageRow: View {
             ForEach(Array(viewModel.actions(for: message).enumerated()), id: \.element.id) { index, action in
                 ArtworkButton(
                     label: action == .play && viewModel.audio.playbackID == message.id && viewModel.audio.isPlaying
-                        ? "暂停播放" : action.label,
+                        ? strings("暂停播放") : action.label,
                     glyph: action.glyph(isAudio: isAudio),
                     ring: action.ring(isAudio: isAudio),
                     size: action == .translate && !isAudio ? 43.8146 : 40.6344,
@@ -171,7 +172,7 @@ struct MessageRow: View {
                         || (action == .edit && viewModel.editingMessageID == message.id)
                         || (action == .play && viewModel.audio.playbackID == message.id && viewModel.audio.isPlaying),
                     isAvailable: viewModel.isAvailable(action, for: message),
-                    unavailableHint: action == .translate ? "此消息没有本地示例翻译" : "此消息没有可播放的录音或可朗读的伙伴回复，或该操作暂不可用"
+                    unavailableHint: action == .translate ? strings("此消息没有本地示例翻译") : strings("此消息没有可播放的录音或可朗读的伙伴回复，或该操作暂不可用")
                 ) {
                     viewModel.perform(action, on: message.id)
                 }
@@ -223,7 +224,7 @@ struct MessageRow: View {
     private func playbackCard(_ clip: LocalAudioClip) -> some View {
         let progress = viewModel.audio.playbackID == message.id ? viewModel.audio.playbackProgress : 0
         return VStack(alignment: .leading, spacing: 10) {
-            Text("语音消息 · \(clip.durationLabel)")
+            Text(strings("语音消息 · \(strings(clip.durationLabel))"))
                 .font(.callout)
             FigmaImage(artwork: .transcriptLine)
                 .frame(maxWidth: 182)
@@ -247,8 +248,8 @@ struct MessageRow: View {
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .overlay { RoundedRectangle(cornerRadius: 10).strokeBorder(.black, lineWidth: 2) }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("语音消息，\(clip.durationLabel)")
-        .accessibilityValue("播放进度\(Int(progress * 100))%")
+        .accessibilityLabel(strings("语音消息，\(strings(clip.durationLabel))"))
+        .accessibilityValue(strings("播放进度\(Int(progress * 100))%"))
         .accessibilityIdentifier("playback.\(message.id)")
     }
 }

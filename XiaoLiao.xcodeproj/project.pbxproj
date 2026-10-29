@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A26C00000000000000000001 /* AppLocalization.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26C00000000000000000002 /* AppLocalization.swift */; };
 		F087D0FAA59BA0139806F31D /* ConversationSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3CFBEBB6033596BC36F34D7 /* ConversationSession.swift */; };
 		2F0249D1680B0A688B88866C /* ConversationSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB3B828F2F7D9A3F37F01238 /* ConversationSettings.swift */; };
 		0C37981A546C7458CB8E4CD5 /* ConversationNavigationMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = E55567AB2D03DA08A20BB92E /* ConversationNavigationMenu.swift */; };
@@ -74,6 +75,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		A26C00000000000000000002 /* AppLocalization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLocalization.swift; sourceTree = "<group>"; };
 		B3CFBEBB6033596BC36F34D7 /* ConversationSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationSession.swift; sourceTree = "<group>"; };
 		AB3B828F2F7D9A3F37F01238 /* ConversationSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationSettings.swift; sourceTree = "<group>"; };
 		E55567AB2D03DA08A20BB92E /* ConversationNavigationMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationNavigationMenu.swift; sourceTree = "<group>"; };
@@ -185,6 +187,7 @@
 			isa = PBXGroup;
 			children = (
 				D382F5CCF2097A77FAB5D54B /* ArtworkControls.swift */,
+				A26C00000000000000000002 /* AppLocalization.swift */,
 				FCF551D6462839D4227EFAF3 /* FigmaArtwork.swift */,
 				3E06E7D280A0D31F527F5221 /* XiaoLiaoTheme.swift */,
 			);
@@ -513,6 +516,7 @@
 				0E5756387B134F17F6F6001A /* ConversationAudioController.swift in Sources */,
 				FBFA0F4C1C46951B674946E4 /* ContentView.swift in Sources */,
 				6616BFE473AB684422612C8D /* ArtworkControls.swift in Sources */,
+				A26C00000000000000000001 /* AppLocalization.swift in Sources */,
 				013554A311D3F02E2E8AD236 /* FigmaArtwork.swift in Sources */,
 				583860D69D3FA072F8F4622A /* XiaoLiaoTheme.swift in Sources */,
 				24EE6BF05565EAED2CE53FD4 /* MessageAction.swift in Sources */,

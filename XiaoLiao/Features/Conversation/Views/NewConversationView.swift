@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct NewConversationView: View {
+    @Environment(\.appStrings) private var strings
     @Bindable var viewModel: ConversationViewModel
     let onStart: () -> Void
     let onMenu: () -> Void
@@ -18,11 +19,11 @@ struct NewConversationView: View {
                         onMenu()
                     }
 
-                    Text("小聊")
+                    Text(strings("小聊"))
                         .font(.system(size: titleSize, weight: .bold))
                         .padding(.top, 12)
 
-                    Text("聊聊天，练英语")
+                    Text(strings("聊聊天，练英语"))
                         .font(.system(size: subtitleSize, weight: .bold))
                         .multilineTextAlignment(.center)
                         .padding(.top, 30)
@@ -38,7 +39,7 @@ struct NewConversationView: View {
                         isPromptFocused = false
                         onStart()
                     } label: {
-                        Text("聊天")
+                        Text(strings("聊天"))
                             .font(.system(size: titleSize, weight: .bold))
                             .foregroundStyle(.white.opacity(viewModel.canStart ? 1 : 0.33))
                             .frame(maxWidth: .infinity)
@@ -75,7 +76,7 @@ struct NewConversationView: View {
         VStack(spacing: 8) {
             ZStack(alignment: .topLeading) {
                 if viewModel.prompt.isEmpty {
-                    Text("请提供聊天话题和对话发生的实际场景，或点击按钮生成提示。")
+                    Text(strings("请提供聊天话题和对话发生的实际场景，或点击按钮生成提示。"))
                         .foregroundStyle(.black.opacity(0.73))
                         .padding(.horizontal, 5)
                         .padding(.top, 8)
@@ -85,14 +86,14 @@ struct NewConversationView: View {
                 TextEditor(text: $viewModel.prompt)
                     .scrollContentBackground(.hidden)
                     .focused($isPromptFocused)
-                    .accessibilityLabel("聊天话题和场景")
+                    .accessibilityLabel(strings("聊天话题和场景"))
                     .accessibilityIdentifier("conversation.prompt")
             }
             .font(.system(size: promptSize, weight: .bold))
 
             HStack {
                 Spacer()
-                ArtworkButton(label: "帮我想个提示吧", glyph: .suggestGlyph, ring: .suggestRing, size: 56) {
+                ArtworkButton(label: strings("帮我想个提示吧"), glyph: .suggestGlyph, ring: .suggestRing, size: 56) {
                     viewModel.suggestPrompt()
                 }
                 .accessibilityIdentifier("conversation.suggest")

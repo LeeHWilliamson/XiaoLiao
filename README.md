@@ -8,6 +8,8 @@ The user confirmed live grammar statistics work for **new typed practice message
 
 On-device English recognition is now implemented for newly sent recordings and recorded replacements. It preserves the audio, attaches a transcript to the same spoken message, and connects that text to replies, grammar, and local statistics without double-counting the message. Build and test this client update on a supported physical iPhone; [speech setup and checks](Docs/SPEECH_RECOGNITION.md) cover model downloads, retry, relaunch, and limitations. No speech backend redeployment is needed.
 
+**For grading:** open Menu → the gear → **Grading Mode / 评分模式**. Enabling it immediately changes app controls, instructions, statistics labels and errors to English, and the preference survives relaunch. Turn it off to restore Chinese. Conversation content stays as-is; system permission prompts/keyboard follow device language. No Cloudflare redeployment is needed.
+
 Navigation now uses one red menu button across conversation, settings and statistics screens. The Figma navy drawer combines 开始新对话, 学习进度, Conversation Settings and saved history. Per-conversation statistics controls remain unavailable. The overall dashboard content is unchanged; its header opens the same menu.
 
 Typed input now has a visible Send arrow inside the text box, including blue system-message mode and edits; Return remains supported where the keyboard provides it.
