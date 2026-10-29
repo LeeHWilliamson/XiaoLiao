@@ -50,6 +50,8 @@
 		88BB7F54034D02001F8892A5 /* TextAnalysisPipelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75618ECF7546A3E901C6D1C6 /* TextAnalysisPipelineTests.swift */; };
 		A10A00000000000000000002 /* ConversationReply.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10A00000000000000000001 /* ConversationReply.swift */; };
 		A10A00000000000000000004 /* ConversationReplyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10A00000000000000000003 /* ConversationReplyTests.swift */; };
+		5FD0E45F40F52FED6E4280BC /* GrammarEvaluation.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD84BAF0064322E192E830DF /* GrammarEvaluation.swift */; };
+		6CC11E3E1C05A9B50EC3BF87 /* GrammarEvaluationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4BCC63D68763A418873A253 /* GrammarEvaluationTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -125,6 +127,15 @@
 		A10A00000000000000000007 /* wrangler.jsonc */ = {isa = PBXFileReference; lastKnownFileType = text; path = wrangler.jsonc; sourceTree = "<group>"; };
 		A10A00000000000000000008 /* worker.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = worker.js; sourceTree = "<group>"; };
 		A10A00000000000000000009 /* worker.test.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = worker.test.js; sourceTree = "<group>"; };
+		DD84BAF0064322E192E830DF /* GrammarEvaluation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GrammarEvaluation.swift; sourceTree = "<group>"; };
+		C4BCC63D68763A418873A253 /* GrammarEvaluationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GrammarEvaluationTests.swift; sourceTree = "<group>"; };
+		E36DBB1A87C2EAAF24ADA76B /* grammar.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = grammar.js; sourceTree = "<group>"; };
+		2F80B2FE4DAF6E15077B5926 /* provider.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = provider.js; sourceTree = "<group>"; };
+		FF038AFC2AD397B6EEE9BA52 /* grammar.test.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = grammar.test.js; sourceTree = "<group>"; };
+		27F43D6E665439B22FAE0C31 /* support.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = support.js; sourceTree = "<group>"; };
+		7FBE9D3B40CA6F36AEEC2C64 /* grammar-cases.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = grammar-cases.json; sourceTree = "<group>"; };
+		88A442412C5A7BC4C55740EE /* review-grammar.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = review-grammar.js; sourceTree = "<group>"; };
+		AAE41CC285EF9C919E0D924B /* GRAMMAR_EVALUATION.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = GRAMMAR_EVALUATION.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -187,6 +198,7 @@
 		E329F95D46805A532206D6A3 /* Conversation */ = {
 			isa = PBXGroup;
 			children = (
+				DD84BAF0064322E192E830DF /* GrammarEvaluation.swift */,
 				A10A00000000000000000001 /* ConversationReply.swift */,
 				F9DB08A4B0A71D2E9E27DF39 /* ConversationHistoryStore.swift */,
 				8B2B9C6C66493FF90802FD6A /* ConversationAudioController.swift */,
@@ -215,6 +227,7 @@
 		3CF4D9833090438700EBB3F1 /* XiaoLiaoTests */ = {
 			isa = PBXGroup;
 			children = (
+				C4BCC63D68763A418873A253 /* GrammarEvaluationTests.swift */,
 				A10A00000000000000000003 /* ConversationReplyTests.swift */,
 				75618ECF7546A3E901C6D1C6 /* TextAnalysisPipelineTests.swift */,
 				514841E0A773B87B4F2A12C1 /* StatisticsDashboardTests.swift */,
@@ -256,6 +269,7 @@
 		A042A750E5204C8392B8DB05 /* Docs */ = {
 			isa = PBXGroup;
 			children = (
+				AAE41CC285EF9C919E0D924B /* GRAMMAR_EVALUATION.md */,
 				A10A00000000000000000005 /* BACKEND_SETUP.md */,
 				A042A750E5204C8392B8DB04 /* FIGMA_ASSETS.md */,
 			);
@@ -302,6 +316,7 @@
 		A10A00000000000000000010 /* Backend */ = {
 			isa = PBXGroup;
 			children = (
+				65423711FA732989FC2E541A /* evaluation */,
 				A10A00000000000000000006 /* package.json */,
 				A10A00000000000000000007 /* wrangler.jsonc */,
 				A10A00000000000000000011 /* src */,
@@ -312,14 +327,27 @@
 		};
 		A10A00000000000000000011 /* src */ = {
 			isa = PBXGroup;
-			children = (A10A00000000000000000008 /* worker.js */,);
+			children = (
+				2F80B2FE4DAF6E15077B5926 /* provider.js */,
+				E36DBB1A87C2EAAF24ADA76B /* grammar.js */,A10A00000000000000000008 /* worker.js */,);
 			path = src;
 			sourceTree = "<group>";
 		};
 		A10A00000000000000000012 /* test */ = {
 			isa = PBXGroup;
-			children = (A10A00000000000000000009 /* worker.test.js */,);
+			children = (
+				27F43D6E665439B22FAE0C31 /* support.js */,
+				FF038AFC2AD397B6EEE9BA52 /* grammar.test.js */,A10A00000000000000000009 /* worker.test.js */,);
 			path = test;
+			sourceTree = "<group>";
+		};
+		65423711FA732989FC2E541A /* evaluation */ = {
+			isa = PBXGroup;
+			children = (
+				88A442412C5A7BC4C55740EE /* review-grammar.js */,
+				7FBE9D3B40CA6F36AEEC2C64 /* grammar-cases.json */,
+			);
+			path = evaluation;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -458,6 +486,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5FD0E45F40F52FED6E4280BC /* GrammarEvaluation.swift in Sources */,
 				A10A00000000000000000002 /* ConversationReply.swift in Sources */,
 				F09E82B45F09E05C58CB59C6 /* StatisticsPreviewData.swift in Sources */,
 				8A39236C84775454DC44FA9C /* StatisticsDashboardView.swift in Sources */,
@@ -495,6 +524,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				6CC11E3E1C05A9B50EC3BF87 /* GrammarEvaluationTests.swift in Sources */,
 				A10A00000000000000000004 /* ConversationReplyTests.swift in Sources */,
 				88BB7F54034D02001F8892A5 /* TextAnalysisPipelineTests.swift in Sources */,
 				2FF005680C39655F51886202 /* StatisticsDashboardTests.swift in Sources */,

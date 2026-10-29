@@ -72,6 +72,9 @@ struct StatisticsDashboardView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await load() } }
         }
+        .onChange(of: conversation.grammarStatisticsRevision) { _, _ in
+            Task { await load() }
+        }
     }
 
     private func load() async {
@@ -95,6 +98,27 @@ struct StatisticsDashboardView: View {
             GrammarProficiencyChart(metrics: dashboard.grammarMetrics, selection: $dashboard.selectedCategory)
             Text("已评估 \(snapshot.overall.grammarEvaluatedAttempts) / \(snapshot.overall.practiceAttempts) 次练习；不确定的机会不计入准确率。")
                 .font(.caption)
+            Text("AI 语法分析 · 根据本条消息的上下文判断")
+                .font(.caption)
+            if conversation.pendingGrammarCount > 0 || conversation.failedGrammarCount > 0 {
+                Text("待分析 \(conversation.pendingGrammarCount) 条 · 未完成 \(conversation.failedGrammarCount) 条")
+                    .font(.caption)
+                    .accessibilityIdentifier("stats.grammar.queue")
+            }
+            if let issue = conversation.grammarQueueIssue {
+                Text(issue).font(.callout)
+            } else if let failure = conversation.grammarFailureMessage {
+                Text(failure).font(.callout)
+            }
+            if conversation.failedGrammarCount > 0 || conversation.grammarQueueIssue != nil {
+                Text("分析失败不会影响聊天，也不会计为语法错误。")
+                    .font(.caption)
+                Button("重试语法分析") { conversation.retryFailedGrammarEvaluations() }
+                    .buttonStyle(.bordered)
+                    .tint(XiaoLiaoTheme.ink)
+                    .frame(minHeight: 44)
+                    .accessibilityIdentifier("stats.grammar.retry")
+            }
         }
 
         StatisticsCard(title: "\(dashboard.selectedCategory.title) · 趋势", subtitle: "每日正确机会 ÷ 当日已确定结果的机会") {

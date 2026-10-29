@@ -2,6 +2,9 @@
   "name": "xiaoliao-api",
   "private": true,
   "type": "module",
-  "scripts": { "test": "node --test --test-isolation=none test/*.test.js" },
+  "scripts": {
+    "test": "node --test --test-isolation=none test/*.test.js",
+    "review:grammar": "node evaluation/review-grammar.js"
+  },
   "engines": { "node": ">=22" }
 }

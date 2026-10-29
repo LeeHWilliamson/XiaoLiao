@@ -96,6 +96,10 @@ nonisolated enum ConversationReplyError: Error, LocalizedError, Sendable {
 }
 
 nonisolated struct ConversationReplyService: Sendable {
+    private struct Failure: Decodable, Sendable {
+        struct Detail: Decodable, Sendable { let message: String }
+        let error: Detail
+    }
     let baseURL: URL
     let betaToken: String?
 
@@ -116,8 +120,14 @@ nonisolated struct ConversationReplyService: Sendable {
     }
 
     func respond(to request: ConversationReplyRequest) async throws -> ConversationReplyResponse {
+        let result: ConversationReplyResponse = try await send(request, path: "v1/conversations/respond")
+        try result.validate(for: request)
+        return result
+    }
+
+    func send<Input: Encodable & Sendable, Output: Decodable & Sendable>(_ request: Input, path: String) async throws -> Output {
         guard let betaToken, betaToken.count >= 32 else { throw ConversationReplyError.notConfigured }
-        var http = URLRequest(url: baseURL.appendingPathComponent("v1/conversations/respond"))
+        var http = URLRequest(url: baseURL.appendingPathComponent(path))
         http.httpMethod = "POST"
         http.timeoutInterval = 50
         http.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -129,16 +139,14 @@ nonisolated struct ConversationReplyService: Sendable {
         catch { throw ConversationReplyError.unavailable }
         guard let response = response as? HTTPURLResponse else { throw ConversationReplyError.invalidResponse }
         guard response.statusCode == 200 else {
-            struct Failure: Decodable { struct Detail: Decodable { let message: String }; let error: Detail }
             if let failure = try? JSONDecoder().decode(Failure.self, from: data), failure.error.message.count <= 300 {
                 throw ConversationReplyError.server(failure.error.message)
             }
             throw ConversationReplyError.unavailable
         }
-        guard let result = try? JSONDecoder().decode(ConversationReplyResponse.self, from: data) else {
+        guard let result = try? JSONDecoder().decode(Output.self, from: data) else {
             throw ConversationReplyError.invalidResponse
         }
-        try result.validate(for: request)
         return result
     }
 }

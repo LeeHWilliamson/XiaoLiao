@@ -2,11 +2,13 @@
 
 小聊 is a native SwiftUI iOS app for Chinese speakers practicing conversational English.
 
-The prototype keeps conversations, settings, message edit versions, and recordings locally. A prepared Cloudflare Worker now supplies real OpenAI text replies: topics/settings shape the partner, and blue system requests can answer questions or adjust the conversation. Loading, failure, explicit retry, and saved pending requests are included. Deployment and Xcode configuration are required before live use; follow [the setup guide](Docs/BACKEND_SETUP.md). Nothing has been deployed from this workspace.
+The prototype keeps conversations, settings, message edit versions, and recordings locally. The deployed Cloudflare Worker supplies OpenAI text replies: topics/settings shape the partner, and blue system requests can answer questions or adjust the conversation. Loading, failure, explicit retry, and saved pending requests are included. The user confirmed live chat works; [the setup guide](Docs/BACKEND_SETUP.md) records configuration.
 
-The OpenAI key stays in Cloudflare. Private Debug runs use a separate beta token; Release builds do not embed shared credentials. Tests/previews retain isolated offline fixtures. Speech recognition, partner audio, grammar/clause evaluation, and production account authentication remain future work.
+Grammar evaluation is now prepared for **new typed practice messages and every new text edit**, without backfilling old history. It runs independently of chat, saves applicable correct/incorrect/uncertain opportunities, and populates the existing overall grammar charts. Failed/interrupted analysis offers a separate retry in statistics and never counts as a grammar mistake. Redeploy the updated Worker and build the updated app before trying it; see [grammar deployment and quality review](Docs/GRAMMAR_EVALUATION.md). Live grammar judgments have not yet been validated.
 
-Committed learner text and text edits now receive automatic local word/sentence analysis. Open the stats icon on either conversation screen to see overall sentence totals, newly observed vocabulary, and vocabulary diversity (MATTR). Grammar and clause metrics remain unavailable until their evaluators are added.
+The OpenAI key stays in Cloudflare. Private Debug runs use a separate beta token; Release builds do not embed shared credentials. Tests/previews retain isolated offline fixtures. Speech recognition, partner audio, clause/vocabulary judgment, and production account authentication remain future work.
+
+Committed learner text and text edits receive automatic local word/sentence analysis. Open the stats icon on either conversation screen to see overall grammar results, sentence totals, newly observed vocabulary, and vocabulary diversity (MATTR). Grammar stays unknown until its actual analysis succeeds; clause metrics remain unavailable.
 
 - Every submitted original and edit counts as a complete practice attempt.
 - Word forms such as `run`, `runs`, and `running` count separately; capitalization is normalized.
@@ -22,4 +24,4 @@ xcodebuild -project XiaoLiao.xcodeproj -scheme XiaoLiao -destination 'generic/pl
 xcodebuild -project XiaoLiao.xcodeproj -scheme XiaoLiao -destination 'platform=iOS Simulator,id=SIMULATOR_UUID' test
 ```
 
-Start with `ConversationReplyTests`, `TextAnalysisPipelineTests`, and the statistics/conversation unit suites. Backend tests run with `npm test` from `Backend` and use mocked provider responses without credentials or paid calls. The UI suite retains isolated offline flows. Build/test status and manual acceptance steps are tracked in [PLAN.md](PLAN.md); project conventions live in [AGENTS.md](AGENTS.md).
+Start with `GrammarEvaluationTests`, `ConversationReplyTests`, `TextAnalysisPipelineTests`, and the statistics/conversation unit suites. All 32 backend tests passed here with mocked provider/storage; run them with `npm test` from `Backend`. Swift tests still require Xcode. The optional `review:grammar` tool runs one public reference case against the deployed evaluator when explicitly given a local beta token; `--list` stays offline. The UI suite retains isolated offline flows. Build/test status and manual acceptance steps are tracked in [PLAN.md](PLAN.md); project conventions live in [AGENTS.md](AGENTS.md).

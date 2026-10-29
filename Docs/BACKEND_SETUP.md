@@ -1,6 +1,6 @@
 # Private-beta text conversations
 
-The app talks to `https://xiaoliao-api.leeharriswilliamson.workers.dev`. The Worker calls OpenAI's Responses API; the OpenAI key stays in Cloudflare. History, recordings, and statistics remain on the phone. This increment sends text only and returns complete text replies, without streaming, speech recognition, synthesized speech, or grammar/clause evaluation.
+The app talks to `https://xiaoliao-api.leeharriswilliamson.workers.dev`. The Worker calls OpenAI's Responses API; the OpenAI key stays in Cloudflare. History, recordings, and statistics remain on the phone. Live text chat was confirmed by the user. The separate [grammar increment](GRAMMAR_EVALUATION.md) now prepares background evaluations of newly submitted text/edits and requires redeployment. Streaming, speech recognition, synthesized speech, and clause evaluation remain future work.
 
 ## 1. Cloudflare secrets
 
@@ -11,6 +11,8 @@ Add one more **Secret** to the same Worker under Settings → Variables and Secr
 | Name | Value |
 | --- | --- |
 | `XIAOLIAO_CLIENT_TOKEN` | A new random ASCII token of at least 32 characters, saved in your password manager. This is NOT the OpenAI key. |
+
+The provider secret must be spelled **`OPENAI_API_KEY`**, including the `AI`. A secret named `OPEN_API_KEY` is not read by the backend. The local Xcode token and Cloudflare beta token must have exactly the same value; stop and relaunch the app after changing its Run environment.
 
 The app uses this separate credential to keep the paid endpoint private during development. You will put this same beta token in your local Xcode Run environment. Do not send either secret here. The token is shared beta access, not production user authentication. Release builds deliberately have no embedded token and cannot use this beta flow; account authentication is required before public/TestFlight distribution.
 

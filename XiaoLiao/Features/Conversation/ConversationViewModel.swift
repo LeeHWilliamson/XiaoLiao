@@ -6,6 +6,7 @@ import Observation
 final class ConversationViewModel {
     typealias TextAnalyzer = @Sendable (Message) async throws -> MessageTextAnalysis?
     typealias ReplyGenerator = @Sendable (ConversationReplyRequest) async throws -> ConversationReplyResponse
+    typealias GrammarEvaluator = @Sendable (GrammarEvaluationRequest) async throws -> GrammarEvaluationResponse
     enum InputMode: Equatable { case voice, text }
     enum Detail: Equatable { case transcript, translation, playback }
 
@@ -28,6 +29,23 @@ final class ConversationViewModel {
     @ObservationIgnored private var replyTasks: [String: Task<Void, Never>] = [:]
     private(set) var generatingSessionIDs: Set<String> = []
     var replyIssue: String?
+    @ObservationIgnored private let grammarEvaluator: GrammarEvaluator?
+    @ObservationIgnored private var grammarEvaluationTask: Task<Void, Never>?
+    private(set) var activeGrammarRequestIDs: Set<String> = []
+    private(set) var grammarStatisticsRevision = 0
+    private(set) var grammarQueueIssue: String?
+
+    var pendingGrammarCount: Int { history.reduce(0) { $0 + $1.grammarEvaluationJobs.count } - failedGrammarCount }
+    var failedGrammarCount: Int {
+        history.flatMap(\.grammarEvaluationJobs).filter {
+            $0.state == .failed || ($0.state == .attempted && !activeGrammarRequestIDs.contains($0.id))
+        }.count
+    }
+    var grammarFailureMessage: String? {
+        history.flatMap(\.grammarEvaluationJobs).first {
+            $0.state == .failed || ($0.state == .attempted && !activeGrammarRequestIDs.contains($0.id))
+        }.map { $0.failureMessage ?? "上次语法分析未完成，请重试。" }
+    }
 
     var usesLiveReplies: Bool { replyGenerator != nil }
     var pendingReply: PendingConversationReply? { history.first { $0.id == activeSessionID }?.pendingReply }
@@ -62,28 +80,34 @@ final class ConversationViewModel {
     private(set) var details: [String: Detail] = [:]
 
     init(history: [ConversationSession]? = nil, audio: ConversationAudioController? = nil,
-         textAnalyzer: TextAnalyzer? = nil, replyGenerator: ReplyGenerator? = nil) {
+         textAnalyzer: TextAnalyzer? = nil, replyGenerator: ReplyGenerator? = nil, grammarEvaluator: GrammarEvaluator? = nil) {
         self.history = history ?? MockConversation.history
         self.audio = audio ?? ConversationAudioController()
         self.replyGenerator = replyGenerator
+        self.grammarEvaluator = grammarEvaluator
         self.textAnalyzer = textAnalyzer ?? { message in
             try await Task.detached(priority: .utility) { try LocalTextAnalyzer.analyze(message) }.value
         }
         retryPendingTextAnalyses()
+        resumeQueuedGrammarEvaluations()
     }
 
     /// The app opts into disk storage explicitly; tests and previews stay isolated.
     static func persistent(directory: URL? = nil, audio: ConversationAudioController? = nil,
-                           textAnalyzer: TextAnalyzer? = nil, replyGenerator: ReplyGenerator? = nil) -> ConversationViewModel {
-        let model = ConversationViewModel(history: [], audio: audio, textAnalyzer: textAnalyzer, replyGenerator: replyGenerator)
+                           textAnalyzer: TextAnalyzer? = nil, replyGenerator: ReplyGenerator? = nil,
+                           grammarEvaluator: GrammarEvaluator? = nil) -> ConversationViewModel {
+        let model = ConversationViewModel(history: [], audio: audio, textAnalyzer: textAnalyzer,
+                                          replyGenerator: replyGenerator, grammarEvaluator: grammarEvaluator)
         model.storageDirectory = directory ?? ConversationHistoryStore.defaultDirectory
         model.retryLoadingHistory()
         return model
     }
 
     static func persistent(store: ConversationHistoryStore, audio: ConversationAudioController? = nil,
-                           textAnalyzer: TextAnalyzer? = nil, replyGenerator: ReplyGenerator? = nil) -> ConversationViewModel {
-        let model = ConversationViewModel(history: [], audio: audio, textAnalyzer: textAnalyzer, replyGenerator: replyGenerator)
+                           textAnalyzer: TextAnalyzer? = nil, replyGenerator: ReplyGenerator? = nil,
+                           grammarEvaluator: GrammarEvaluator? = nil) -> ConversationViewModel {
+        let model = ConversationViewModel(history: [], audio: audio, textAnalyzer: textAnalyzer,
+                                          replyGenerator: replyGenerator, grammarEvaluator: grammarEvaluator)
         model.storageDirectory = store.directory
         model.historyStore = store
         model.retryLoadingHistory()
@@ -103,6 +127,7 @@ final class ConversationViewModel {
                 return !FileManager.default.fileExists(atPath: url.path)
             }) ? StorageIssue(message: "部分录音文件暂不可用。对话文字和设置仍已保留。") : nil
             retryPendingTextAnalyses()
+            resumeQueuedGrammarEvaluations()
         } catch {
             isStorageReady = false
             storageIssue = StorageIssue(message: "无法读取本地历史。已有数据未被清除。请稍后重试。", canRetryLoading: true)
@@ -267,6 +292,7 @@ final class ConversationViewModel {
         selectedMessageID = nil
         enqueueTextAnalysis(submitted)
         launchReply(in: sessionID)
+        resumeQueuedGrammarEvaluations()
         return true
     }
 
@@ -448,7 +474,10 @@ final class ConversationViewModel {
         var session = history[index]
         session.grammarObservations.removeAll { $0.metadata.messageID == observation.metadata.messageID }
         session.grammarObservations.append(observation)
-        return commitSession(session)
+        session.grammarEvaluationJobs.removeAll { $0.request.messageID == observation.metadata.messageID }
+        guard commitSession(session) else { return false }
+        grammarStatisticsRevision += 1
+        return true
     }
 
     @discardableResult
@@ -626,16 +655,20 @@ final class ConversationViewModel {
 
 extension ConversationViewModel {
     private func commitTurn(_ updated: [Message], replyingTo message: Message) -> Bool {
-        guard usesLiveReplies else { return commitMessages(updated) }
         guard let index = history.firstIndex(where: { $0.id == activeSessionID }) else { return false }
         var session = history[index]
         session.messages = updated
         session.settings = settings
         do {
-            session.pendingReply = .init(request: try ConversationReplyRequest(session: session, replyingTo: message), failureMessage: nil)
+            if usesLiveReplies {
+                session.pendingReply = .init(request: try ConversationReplyRequest(session: session, replyingTo: message), failureMessage: nil)
+            }
         } catch {
             replyIssue = error.localizedDescription
             return false
+        }
+        if grammarEvaluator != nil, let request = GrammarEvaluationRequest(message: message) {
+            session.grammarEvaluationJobs.append(.init(request: request))
         }
         return commitSession(session)
     }
@@ -707,5 +740,114 @@ extension ConversationViewModel {
 
     func waitForPendingReplies() async {
         while let task = replyTasks.values.first { await task.value }
+    }
+}
+
+extension ConversationViewModel {
+    /// Only explicitly queued NEW attempts are considered. Missing observations
+    /// in older history never turn into an automatic paid backfill.
+    func resumeQueuedGrammarEvaluations() {
+        guard grammarEvaluator != nil, grammarEvaluationTask == nil,
+              storageDirectory == nil || isStorageReady,
+              history.contains(where: { $0.grammarEvaluationJobs.contains { $0.state == .queued } }) else { return }
+        grammarQueueIssue = nil
+        grammarEvaluationTask = Task { [weak self] in
+            guard let self else { return }
+            await self.drainGrammarEvaluations()
+            self.grammarEvaluationTask = nil
+        }
+    }
+
+    /// Explicit user retry only; attempted/interrupted jobs are not retried on launch.
+    func retryFailedGrammarEvaluations() {
+        guard grammarEvaluator != nil else { return }
+        grammarQueueIssue = nil
+        for index in history.indices {
+            var session = history[index]
+            var changed = false
+            for jobIndex in session.grammarEvaluationJobs.indices {
+                let job = session.grammarEvaluationJobs[jobIndex]
+                if job.state != .queued && !activeGrammarRequestIDs.contains(job.id) {
+                    session.grammarEvaluationJobs[jobIndex].state = .queued
+                    session.grammarEvaluationJobs[jobIndex].failureMessage = nil
+                    changed = true
+                }
+            }
+            if changed && !saveGrammarWork(session) { return }
+        }
+        resumeQueuedGrammarEvaluations()
+    }
+
+    func waitForPendingGrammarEvaluations() async {
+        while let task = grammarEvaluationTask { await task.value }
+    }
+
+    private func drainGrammarEvaluations() async {
+        guard let grammarEvaluator else { return }
+        while let job = history.reversed().flatMap(\.grammarEvaluationJobs).first(where: { $0.state == .queued }) {
+            guard let index = history.firstIndex(where: { $0.id == job.request.conversationID }),
+                  let jobIndex = history[index].grammarEvaluationJobs.firstIndex(where: { $0.id == job.id }) else { break }
+            var session = history[index]
+            session.grammarEvaluationJobs[jobIndex].state = .attempted
+            // Record the attempt BEFORE the paid call. A killed app will offer an
+            // explicit retry rather than silently repeat an ambiguous request.
+            guard saveGrammarWork(session) else { break }
+            activeGrammarRequestIDs.insert(job.id)
+            let saved: Bool
+            do {
+                let response = try await grammarEvaluator(job.request)
+                let observation = try response.observation(for: job.request)
+                saved = completeGrammarEvaluation(observation, request: job.request)
+            } catch {
+                saved = failGrammarEvaluation(error, request: job.request)
+            }
+            activeGrammarRequestIDs.remove(job.id)
+            if !saved { break }
+        }
+    }
+
+    private func completeGrammarEvaluation(_ observation: GrammarObservation, request: GrammarEvaluationRequest) -> Bool {
+        guard let index = history.firstIndex(where: { $0.id == request.conversationID }),
+              history[index].grammarEvaluationJobs.contains(where: { $0.request == request }),
+              let message = history[index].messages.first(where: { $0.id == request.messageID }), request.matches(message) else { return true }
+        var session = history[index]
+        session.grammarEvaluationJobs.removeAll { $0.id == request.requestID }
+        // A manually supplied result wins over any late automatic evaluation.
+        if !session.grammarObservations.contains(where: { $0.metadata.messageID == request.messageID }) {
+            session.grammarObservations.append(observation)
+        }
+        guard saveGrammarWork(session) else { return false }
+        grammarStatisticsRevision += 1
+        return true
+    }
+
+    private func failGrammarEvaluation(_ error: Error, request: GrammarEvaluationRequest) -> Bool {
+        guard let index = history.firstIndex(where: { $0.id == request.conversationID }),
+              let jobIndex = history[index].grammarEvaluationJobs.firstIndex(where: { $0.request == request }) else { return true }
+        var session = history[index]
+        session.grammarEvaluationJobs[jobIndex].state = .failed
+        session.grammarEvaluationJobs[jobIndex].failureMessage = (error as? ConversationReplyError)?.localizedDescription
+            ?? "语法分析暂不可用，请稍后重试。"
+        return saveGrammarWork(session)
+    }
+
+    /// Merge analysis/job state only, without turning a successful send into a
+    /// storage error or clearing an unrelated chat/history alert.
+    private func saveGrammarWork(_ session: ConversationSession) -> Bool {
+        guard let index = history.firstIndex(where: { $0.id == session.id }) else { return false }
+        do {
+            try session.validate()
+            let saved: ConversationSession
+            if storageDirectory != nil {
+                guard isStorageReady, let historyStore else { throw CocoaError(.fileWriteUnknown) }
+                saved = try historyStore.save(session)
+            } else { saved = session }
+            history[index] = saved
+            if activeSessionID == saved.id { grammarObservations = saved.grammarObservations }
+            return true
+        } catch {
+            grammarQueueIssue = "无法保存语法分析进度。消息已保留，请检查储存空间后重试分析。"
+            return false
+        }
     }
 }

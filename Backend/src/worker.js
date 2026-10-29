@@ -1,3 +1,6 @@
+import { APIError, requestModelJSON } from "./provider.js";
+import { validateGrammarRequest, generateGrammarEvaluation } from "./grammar.js";
+
 // Native Worker APIs only. No provider SDK, client-supplied model, tools, or API keys.
 const MAX_BODY = 100_000;
 const CACHE_MS = 24 * 60 * 60 * 1000;
@@ -7,12 +10,6 @@ const tones = ["warm", "casual", "formal"];
 const vocabulary = ["simple", "medium", "complex"];
 const lengths = ["brief", "medium", "complex"];
 
-class APIError extends Error {
-  constructor(status, code, message, retryable = false) {
-    super(message);
-    Object.assign(this, { status, code, retryable });
-  }
-}
 const json = (body, status = 200) => Response.json(body, {
   status, headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" }
 });
@@ -120,33 +117,8 @@ Return a JSON object matching the schema, with reply text and the full resulting
 }
 
 export async function generateReply(request, env, fetcher = fetch) {
-  let response;
+  let result = await requestModelJSON(request.requestID, providerBody(request, env.OPENAI_MODEL || "gpt-6.1-terra"), env, fetcher);
   try {
-    response = await fetcher("https://api.openai.com/v1/responses", {
-      method: "POST", headers: { "Authorization": `Bearer ${env.OPENAI_API_KEY}`, "Content-Type": "application/json",
-        "X-Client-Request-Id": request.requestID },
-      body: JSON.stringify(providerBody(request, env.OPENAI_MODEL || "gpt-6.1-terra")),
-      signal: AbortSignal.timeout(35_000)
-    });
-  } catch {
-    throw new APIError(504, "provider_timeout", "回复暂未收到，请稍后重试。", true);
-  }
-  if (!response.ok) {
-    // Do not expose upstream bodies, credentials, billing details, or provider internals.
-    const rateLimited = response.status === 429;
-    throw new APIError(503, rateLimited ? "provider_busy" : "provider_unavailable",
-      rateLimited ? "AI 服务繁忙，请稍后重试。" : "AI 服务暂不可用，请稍后重试。", true);
-  }
-  let result;
-  try {
-    const body = await response.json();
-    if (body.status !== "completed" || !Array.isArray(body.output)) throw new Error();
-    const contents = body.output.filter(item => item.type === "message" && item.role === "assistant")
-      .flatMap(item => item.content ?? []);
-    if (contents.some(item => item.type === "refusal")) {
-      throw new APIError(422, "refused", "暂时无法回复这条消息。请调整主题或内容。");
-    }
-    result = JSON.parse(contents.filter(item => item.type === "output_text").map(item => item.text).join(""));
     if (!text(result.text, 6000)) throw new Error();
     result = { text: result.text.trim(), settings: settings(result.settings) };
   } catch (error) {
@@ -164,16 +136,17 @@ export default {
     try {
       const path = new URL(request.url).pathname;
       if (path === "/health" && request.method === "GET") return json({ service: "xiaoliao-api", status: "ok", version: 1 });
-      if (path !== "/v1/conversations/respond") return json({ error: { code: "not_found", message: "Not found", retryable: false } }, 404);
+      if (path !== "/v1/conversations/respond" && path !== "/v1/grammar/evaluate") return json({ error: { code: "not_found", message: "Not found", retryable: false } }, 404);
       if (request.method !== "POST") return json({ error: { code: "method_not_allowed", message: "POST required", retryable: false } }, 405);
       if (!env.OPENAI_API_KEY || !env.XIAOLIAO_CLIENT_TOKEN || !env.CHAT_GATEWAY) {
         throw new APIError(503, "not_configured", "服务尚未配置完成。");
       }
       if (!await authorized(request, env.XIAOLIAO_CLIENT_TOKEN)) throw new APIError(401, "unauthorized", "测试访问凭证无效。");
-      const value = validateRequest(await readJSON(request));
+      const isGrammar = path === "/v1/grammar/evaluate";
+      const value = isGrammar ? validateGrammarRequest(await readJSON(request)) : validateRequest(await readJSON(request));
       // One beta-wide gate: changing device IDs cannot bypass the paid-call limits.
       const gateway = env.CHAT_GATEWAY.get(env.CHAT_GATEWAY.idFromName("private-beta"));
-      return await gateway.fetch(new Request("https://gateway.internal/respond", {
+      return await gateway.fetch(new Request(isGrammar ? "https://gateway.internal/grammar" : "https://gateway.internal/respond", {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(value)
       }));
     } catch (error) { return failure(error); }
@@ -185,9 +158,10 @@ export class ConversationGateway {
 
   async fetch(httpRequest) {
     try {
-      const request = validateRequest(await readJSON(httpRequest));
+      const isGrammar = new URL(httpRequest.url).pathname === "/grammar";
+      const request = isGrammar ? validateGrammarRequest(await readJSON(httpRequest)) : validateRequest(await readJSON(httpRequest));
       const hash = await digest(JSON.stringify(request));
-      const key = `reply:${request.requestID}`;
+      const key = isGrammar ? `grammar:${request.requestID}` : `reply:${request.requestID}`;
       const now = Date.now();
       const cached = await this.state.storage.transaction(async storage => {
         const previous = await storage.get(key);
@@ -202,14 +176,20 @@ export class ConversationGateway {
         const minuteCount = limits.minute === minute ? limits.minuteCount : 0;
         const dayCount = limits.day === day ? limits.dayCount : 0;
         if (minuteCount >= 10 || dayCount >= 200) throw new APIError(429, "rate_limited", "已达到测试请求限额，请稍后再试。", true);
-        await storage.put("limits", { minute, day, minuteCount: minuteCount + 1, dayCount: dayCount + 1 });
+        const grammarMinuteCount = limits.minute === minute ? (limits.grammarMinuteCount ?? 0) : 0;
+        const grammarDayCount = limits.day === day ? (limits.grammarDayCount ?? 0) : 0;
+        if (isGrammar && (grammarMinuteCount >= 4 || grammarDayCount >= 100)) {
+          throw new APIError(429, "grammar_rate_limited", "语法分析已达到测试限额，请稍后重试。", true);
+        }
+        await storage.put("limits", { minute, day, minuteCount: minuteCount + 1, dayCount: dayCount + 1,
+          grammarMinuteCount: grammarMinuteCount + (isGrammar ? 1 : 0), grammarDayCount: grammarDayCount + (isGrammar ? 1 : 0) });
         await storage.put(key, { hash, startedAt: now, expiresAt: now + CACHE_MS });
         return null;
       });
       if (cached) return json(cached);
       if (await this.state.storage.getAlarm() === null) await this.state.storage.setAlarm(now + 3_600_000);
       try {
-        const result = await generateReply(request, this.env);
+        const result = isGrammar ? await generateGrammarEvaluation(request, this.env) : await generateReply(request, this.env);
         await this.state.storage.put(key, { hash, startedAt: now, expiresAt: now + CACHE_MS, result });
         return json(result);
       } catch (error) {
@@ -222,7 +202,9 @@ export class ConversationGateway {
 
   async alarm() {
     const now = Date.now();
-    const entries = await this.state.storage.list({ prefix: "reply:" });
+    const replies = await this.state.storage.list({ prefix: "reply:" });
+    const grammar = await this.state.storage.list({ prefix: "grammar:" });
+    const entries = new Map([...replies, ...grammar]);
     const expired = [...entries].filter(([, value]) => value.expiresAt <= now).map(([key]) => key);
     if (expired.length) await this.state.storage.delete(expired);
     if (entries.size > expired.length) await this.state.storage.setAlarm(now + 3_600_000);

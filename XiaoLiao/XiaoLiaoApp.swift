@@ -30,6 +30,7 @@ struct XiaoLiaoApp: App {
         }
         #endif
         let service = ConversationReplyService.configured()
-        return .persistent(replyGenerator: { request in try await service.respond(to: request) })
+        return .persistent(replyGenerator: { request in try await service.respond(to: request) },
+                           grammarEvaluator: { request in try await service.evaluateGrammar(request) })
     }
 }

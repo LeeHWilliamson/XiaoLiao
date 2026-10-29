@@ -69,7 +69,10 @@ struct ContentView: View {
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .background { conversation.audio.interrupt() }
-            if phase == .active { conversation.retryPendingTextAnalyses() }
+            if phase == .active {
+                conversation.retryPendingTextAnalyses()
+                conversation.resumeQueuedGrammarEvaluations()
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: AVAudioSession.interruptionNotification)) { notification in
             if let raw = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,

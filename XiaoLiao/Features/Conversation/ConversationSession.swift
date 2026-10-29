@@ -11,10 +11,12 @@ nonisolated struct ConversationSession: Identifiable, Equatable, Codable, Sendab
     var vocabularyObservations: [VocabularyObservation] = []
     var textAnalyses: [MessageTextAnalysis] = []
     var pendingReply: PendingConversationReply?
+    var grammarEvaluationJobs: [GrammarEvaluationJob]
 
     init(id: String, title: String, prompt: String, messages: [Message], settings: ConversationSettings,
          grammarObservations: [GrammarObservation] = [], vocabularyObservations: [VocabularyObservation] = [],
-         textAnalyses: [MessageTextAnalysis] = [], pendingReply: PendingConversationReply? = nil) {
+         textAnalyses: [MessageTextAnalysis] = [], pendingReply: PendingConversationReply? = nil,
+         grammarEvaluationJobs: [GrammarEvaluationJob] = []) {
         self.id = id
         self.title = title
         self.prompt = prompt
@@ -24,10 +26,11 @@ nonisolated struct ConversationSession: Identifiable, Equatable, Codable, Sendab
         self.vocabularyObservations = vocabularyObservations
         self.textAnalyses = textAnalyses
         self.pendingReply = pendingReply
+        self.grammarEvaluationJobs = grammarEvaluationJobs
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, title, prompt, messages, settings, grammarObservations, vocabularyObservations, textAnalyses, pendingReply
+        case id, title, prompt, messages, settings, grammarObservations, vocabularyObservations, textAnalyses, pendingReply, grammarEvaluationJobs
     }
 
     init(from decoder: any Decoder) throws {
@@ -41,6 +44,7 @@ nonisolated struct ConversationSession: Identifiable, Equatable, Codable, Sendab
         vocabularyObservations = try values.decode([VocabularyObservation].self, forKey: .vocabularyObservations)
         textAnalyses = try values.decodeIfPresent([MessageTextAnalysis].self, forKey: .textAnalyses) ?? []
         pendingReply = try values.decodeIfPresent(PendingConversationReply.self, forKey: .pendingReply)
+        grammarEvaluationJobs = try values.decodeIfPresent([GrammarEvaluationJob].self, forKey: .grammarEvaluationJobs) ?? []
     }
 
     var latestMessages: [Message] { Self.latestVersions(in: messages) }
@@ -120,6 +124,19 @@ nonisolated struct ConversationSession: Identifiable, Equatable, Codable, Sendab
                 }
             } else if !messages.isEmpty || !request.messages.isEmpty || request.kind != .partner {
                 throw ValidationError.invalidMessage
+            }
+        }
+        guard Set(grammarEvaluationJobs.map(\.id)).count == grammarEvaluationJobs.count,
+              Set(grammarEvaluationJobs.map { $0.request.messageID }).count == grammarEvaluationJobs.count else {
+            throw ValidationError.invalidObservation
+        }
+        for job in grammarEvaluationJobs {
+            guard UUID(uuidString: job.id) != nil, job.request.conversationID == id,
+                  let message = records[job.request.messageID], case .text = message.content,
+                  job.request.matches(message), job.request.rubricVersion == GrammarEvaluationRequest.currentRubricVersion,
+                  job.request.text.utf16.count <= 4000,
+                  !grammarObservations.contains(where: { $0.metadata.messageID == message.id }) else {
+                throw ValidationError.invalidObservation
             }
         }
         guard Set(grammarObservations.map(\.id)).count == grammarObservations.count,
