@@ -60,10 +60,21 @@ final class ConversationAudioController: NSObject, AVAudioRecorderDelegate, AVAu
 
     var hasDraft: Bool { recordingState != .idle }
     var canSend: Bool { recordingState == .recording || recordingState == .review }
+    var isPreviewingDraft: Bool { playbackID == "recording-draft" && isPlaying }
+
+    var draftControlLabel: String {
+        switch recordingState {
+        case .idle: "录音"
+        case .requestingPermission: "正在请求麦克风权限"
+        case .recording: "结束录音，准备试听"
+        case .processing: "正在整理录音"
+        case .review: isPreviewingDraft ? "暂停试听" : "播放录音"
+        }
+    }
 
     @discardableResult
     func startRecording() -> Task<Void, Never>? {
-        guard recordingState == .idle || recordingState == .review else { return nil }
+        guard recordingState == .idle else { return nil }
         stopPlayback()
         issue = nil
         generation = UUID()
@@ -114,8 +125,8 @@ final class ConversationAudioController: NSObject, AVAudioRecorderDelegate, AVAu
         }
     }
 
-    /// Close each segment before review so playback always reads a finalized file.
-    /// Resuming records a new segment; joining keeps all previous speech intact.
+    /// End capture and close the file before review. Review only plays/pauses;
+    /// a new take must explicitly restart and discard this draft first.
     func pauseRecording() async {
         guard recordingState == .recording, let recorder, let url = currentSegment else { return }
         let request = generation
@@ -201,6 +212,23 @@ final class ConversationAudioController: NSObject, AVAudioRecorderDelegate, AVAu
     func previewDraft() {
         guard recordingState == .review, let reviewClip else { return }
         togglePlayback(reviewClip, id: "recording-draft")
+    }
+
+    func toggleDraftControl() async {
+        switch recordingState {
+        case .recording: await pauseRecording()
+        case .review: previewDraft()
+        case .idle, .requestingPermission, .processing: break
+        }
+    }
+
+    /// Explicitly replace only the unsent take. Invalidate all old permission/
+    /// finalization work before requesting a fresh recording from zero.
+    @discardableResult
+    func restartRecording() -> Task<Void, Never>? {
+        guard hasDraft else { return nil }
+        cancelDraft()
+        return startRecording()
     }
 
     func togglePlayback(_ clip: LocalAudioClip, id: String) {

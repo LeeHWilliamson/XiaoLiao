@@ -181,48 +181,62 @@ struct ConversationFeedView: View {
     private var recordingRow: some View {
         let audio = viewModel.audio
         return HStack(spacing: 8) {
-            ArtworkButton(
-                label: audio.recordingState == .review ? "继续录音" : "暂停录音并试听",
-                glyph: .pauseGlyph,
-                size: 64,
-                isActive: audio.recordingState == .review,
-                isAvailable: audio.recordingState == .recording || audio.recordingState == .review,
-                unavailableHint: "正在请求麦克风权限或整理录音，请稍候"
-            ) {
-                if audio.recordingState == .recording {
-                    Task { await audio.pauseRecording() }
-                } else {
-                    audio.startRecording()
-                }
+            Button { viewModel.restartRecording() } label: {
+                FigmaImage(artwork: .controlRing)
+                    .frame(width: 64, height: 64)
+                    .overlay {
+                        FigmaImage(artwork: .repeatGlyph)
+                            .frame(width: 32, height: 32 * FigmaArtwork.repeatGlyph.size.height / FigmaArtwork.repeatGlyph.size.width)
+                    }
             }
-            .accessibilityIdentifier("conversation.pauseRecording")
+            .buttonStyle(.plain)
+            .disabled(!audio.canSend)
+            .accessibilityLabel("重新录音")
+            .accessibilityHint("丢弃当前未发送的录音，从头开始录制")
+            .accessibilityIdentifier("conversation.restartRecording")
 
-            Button { audio.previewDraft() } label: {
-                HStack(spacing: 0) {
-                    Text(audio.recordingState == .processing || audio.recordingState == .requestingPermission
-                         ? "…" : "\(max(0, Int(audio.duration)))秒")
-                        .font(.callout.monospacedDigit())
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                        .frame(minWidth: 40)
-                    FigmaImage(artwork: .recordingWaveLead)
-                        .frame(width: 41.9879, height: 31)
-                    FigmaImage(artwork: .recordingWaveTrail)
-                        .frame(width: 42, height: 29)
+            Button { Task { await audio.toggleDraftControl() } } label: {
+                HStack(spacing: 10) {
+                    if audio.canSend {
+                        Image((audio.recordingState == .recording || audio.isPreviewingDraft
+                               ? FigmaArtwork.pauseGlyph : .playGlyph).rawValue)
+                            .renderingMode(.template)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 24, height: 24)
+                    } else {
+                        ProgressView().tint(.white)
+                            .frame(width: 24, height: 24)
+                    }
+                    VStack(spacing: 6) {
+                        Text(recordingStatus(audio))
+                            .font(.caption.monospacedDigit().weight(.semibold))
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
+                        HStack(spacing: 0) {
+                            recordingWave(.recordingWaveLead)
+                            recordingWave(.recordingWaveTrail)
+                        }
+                        .frame(maxWidth: 84)
+                        .frame(height: 31)
+                        .scaleEffect(x: 1, y: reduceMotion || audio.recordingState != .recording ? 1 : 0.65 + 0.35 * audio.level)
+                    }
+                    .frame(maxWidth: .infinity)
                 }
-                .opacity(reduceMotion || audio.recordingState != .recording ? 1 : 0.4 + 0.6 * audio.level)
                 .foregroundStyle(.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
                 .frame(maxWidth: .infinity, minHeight: 77)
                 .background(XiaoLiaoTheme.green)
                 .clipShape(RoundedRectangle(cornerRadius: 20))
                 .overlay { RoundedRectangle(cornerRadius: 20).strokeBorder(.black, lineWidth: 2) }
             }
             .buttonStyle(.plain)
-            .disabled(audio.recordingState != .review)
-            .accessibilityLabel(audio.playbackID == "recording-draft" && audio.isPlaying ? "暂停试听" : "试听录音")
+            .disabled(!audio.canSend)
+            .accessibilityLabel(audio.draftControlLabel)
             .accessibilityValue("\(Int(audio.duration))秒")
-            .accessibilityHint("暂停录音后可轻点试听；切换键盘或离开对话会丢弃录音")
-            .accessibilityIdentifier("conversation.previewRecording")
+            .accessibilityHint("录音时轻点结束采集，随后轻点播放或暂停试听；左侧按钮丢弃当前录音并重新录制")
+            .accessibilityIdentifier("conversation.recordingControl")
 
             ArtworkButton(
                 label: "发送录音", glyph: .sendAudioGlyph, size: 64,
@@ -240,26 +254,54 @@ struct ConversationFeedView: View {
         .accessibilityElement(children: .contain)
     }
 
+    private func recordingWave(_ artwork: FigmaArtwork) -> some View {
+        Image(artwork.rawValue)
+            .renderingMode(.template)
+            .resizable()
+            .scaledToFit()
+            .frame(maxWidth: .infinity)
+            .accessibilityHidden(true)
+    }
+
+    private func recordingStatus(_ audio: ConversationAudioController) -> String {
+        switch audio.recordingState {
+        case .idle: "录音"
+        case .requestingPermission: "等待权限…"
+        case .processing: "正在整理…"
+        case .recording: "录音中 · \(max(0, Int(audio.duration)))秒"
+        case .review: "\(audio.isPreviewingDraft ? "试听中" : "待发送") · \(max(1, Int(audio.duration.rounded(.up))))秒"
+        }
+    }
+
     private var textComposer: some View {
         HStack(spacing: 14) {
             systemModeButton(size: 53)
 
-            TextField(viewModel.isSystemMessageMode ? "联系推荐人" : "Textbox", text: $viewModel.draft, axis: .vertical)
-                .font(.title2)
-                .lineLimit(1...4)
-                .padding(10)
-                .frame(minHeight: 53)
-                .background(viewModel.isSystemMessageMode ? XiaoLiaoTheme.systemRequest : .white)
-                .overlay { Rectangle().strokeBorder(.black, lineWidth: 1) }
-                .focused($isComposerFocused)
-                .disabled(!viewModel.canSubmitMessage)
-                .submitLabel(.send)
-                .onSubmit {
-                    if viewModel.submitDraft() { isComposerFocused = false }
-                }
-                .accessibilityLabel(viewModel.isSystemMessageMode ? "向小聊发送系统消息" : viewModel.editingMessageID == nil ? "输入消息" : "编辑消息")
-                .accessibilityHint(viewModel.canSubmitMessage ? "" : "请等待回复，或处理失败的请求后继续")
-                .accessibilityIdentifier("conversation.draft")
+            HStack(alignment: .bottom, spacing: 0) {
+                TextField(viewModel.isSystemMessageMode ? "联系推荐人" : "Textbox", text: $viewModel.draft, axis: .vertical)
+                    .font(.title2)
+                    .lineLimit(1...4)
+                    .padding(10)
+                    .frame(minHeight: 53)
+                    .focused($isComposerFocused)
+                    .disabled(!viewModel.canSubmitMessage)
+                    .submitLabel(.send)
+                    .onSubmit(sendText)
+                    .accessibilityLabel(viewModel.isSystemMessageMode ? "向小聊发送系统消息" : viewModel.editingMessageID == nil ? "输入消息" : "编辑消息")
+                    .accessibilityHint(viewModel.canSubmitMessage ? "" : "请等待回复，或处理失败的请求后继续")
+                    .accessibilityIdentifier("conversation.draft")
+
+                ArtworkButton(label: viewModel.isSystemMessageMode ? "发送系统消息" : viewModel.editingMessageID == nil ? "发送消息" : "发送修改",
+                              glyph: .sendAudioGlyph, size: 44,
+                              isAvailable: viewModel.canSubmitMessage && !viewModel.audio.hasDraft
+                                && !viewModel.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                              unavailableHint: "请输入消息，并等待当前回复完成后发送", action: sendText)
+                    .accessibilityIdentifier("conversation.sendText")
+                    .padding(.trailing, 4)
+                    .padding(.bottom, 4)
+            }
+            .background(viewModel.isSystemMessageMode ? XiaoLiaoTheme.systemRequest : .white)
+            .overlay { Rectangle().strokeBorder(.black, lineWidth: 1) }
 
             ArtworkButton(label: "返回语音输入", glyph: .microphoneGlyph, size: 53,
                           isAvailable: !viewModel.isSystemMessageMode,
@@ -273,6 +315,10 @@ struct ConversationFeedView: View {
         .padding(.horizontal, 16)
         .frame(maxWidth: 560)
         .frame(maxWidth: .infinity)
+    }
+
+    private func sendText() {
+        if viewModel.submitDraft() { isComposerFocused = false }
     }
 
     private func systemModeButton(size: CGFloat) -> some View {

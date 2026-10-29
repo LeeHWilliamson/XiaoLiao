@@ -4,6 +4,68 @@ import XCTest
 
 final class ConversationAudioTests: XCTestCase {
     @MainActor
+    func testRestartInvalidatesOldPermissionAndLeavingCancelsTheNewTake() async {
+        let firstRequest = expectation(description: "Original permission request")
+        let secondRequest = expectation(description: "Restarted permission request")
+        var replies: [CheckedContinuation<Bool, Never>] = []
+        let audio = ConversationAudioController(permissionRequest: {
+            await withCheckedContinuation { continuation in
+                replies.append(continuation)
+                if replies.count == 1 { firstRequest.fulfill() } else { secondRequest.fulfill() }
+            }
+        })
+        XCTAssertNil(audio.restartRecording()) // An idle/left conversation must not start capture.
+        let original = audio.startRecording()
+        await fulfillment(of: [firstRequest], timeout: 2)
+        let restarted = audio.restartRecording()
+        await fulfillment(of: [secondRequest], timeout: 2)
+        replies[0].resume(returning: true)
+        await original?.value
+        XCTAssertEqual(audio.recordingState, .requestingPermission)
+        XCTAssertEqual(audio.duration, 0)
+        XCTAssertEqual(audio.level, 0)
+        XCTAssertNil(audio.reviewClip)
+        XCTAssertNil(audio.playbackID)
+        XCTAssertNil(audio.issue)
+        audio.cancelDraft()
+        replies[1].resume(returning: true)
+        await restarted?.value
+        XCTAssertEqual(audio.recordingState, .idle)
+        XCTAssertFalse(audio.isPlaying)
+        XCTAssertFalse(audio.canSend)
+        XCTAssertNil(audio.restartRecording())
+    }
+
+    @MainActor
+    func testRestartingRecordedEditKeepsItsTargetAndOriginalAudio() async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let audio = ConversationAudioController(permissionRequest: { false })
+        let model = ConversationViewModel(audio: audio)
+        model.suggestPrompt()
+        XCTAssertTrue(model.startConversation())
+        let id = try XCTUnwrap(model.activeSessionID)
+        let originalClip = try makeClip(in: directory)
+        XCTAssertTrue(model.commitRecording(originalClip, in: id))
+        let original = try XCTUnwrap(model.messages.last)
+        let versions = model.messageVersions
+        model.selectMessage(original.id)
+        model.perform(.edit, on: original.id)
+        XCTAssertEqual(model.editingMessageID, original.id)
+        let restart = model.restartRecording()
+        XCTAssertNotNil(restart)
+        XCTAssertEqual(model.editingMessageID, original.id)
+        XCTAssertEqual(audio.duration, 0)
+        await restart?.value
+        XCTAssertEqual(model.messageVersions, versions)
+        XCTAssertEqual(model.editingMessageID, original.id)
+        XCTAssertEqual(model.audioClip(for: original), originalClip)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: originalClip.url.path))
+        model.prepareNewConversation()
+        XCTAssertNil(model.restartRecording())
+    }
+
+    @MainActor
     func testPartnerSpeechAvailabilitySurvivesHistoryAndKeepsSystemAndLearnerTextSilent() throws {
         let id = "speech-session"
         let partner = Message(conversationID: id, senderRole: .aiPartner, modality: .written,

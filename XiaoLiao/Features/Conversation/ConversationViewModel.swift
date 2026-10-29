@@ -346,6 +346,18 @@ final class ConversationViewModel {
     }
 
     @discardableResult
+    func restartRecording() -> Task<Void, Never>? {
+        guard activeSessionID != nil, audio.hasDraft, !isSystemMessageMode, canSubmitMessage else { return nil }
+        if let id = editingMessageID {
+            guard canEditMessage(id), messages.first(where: { $0.id == id })?.audioAttachment != nil else { return nil }
+        }
+        if let clip = audio.reviewClip { temporaryRecordings[clip.url.lastPathComponent] = nil }
+        // Keep the edit target: restarting a replacement must not turn it into
+        // a new message or remove the original committed recording.
+        return audio.restartRecording()
+    }
+
+    @discardableResult
     func sendRecording() async -> Bool {
         guard let sessionID = activeSessionID, audio.canSend else { return false }
         let replacementID = editingMessageID

@@ -8,7 +8,7 @@ Use a physical iPhone or iPad running **iOS/iPadOS 26.5 or later**, matching the
 
 1. Sync the updated repository to your Mac and build the app in Xcode. Select your connected iPhone as the Run destination and use the existing signing configuration.
 2. Keep the working Debug Run `XIAOLIAO_API_TOKEN` environment variable and launch from Xcode. This client-only feature needs **no Cloudflare redeployment or new secret**, assuming the already working conversation and grammar endpoints remain deployed.
-3. Start a conversation, switch to voice, record a short English sentence such as `I like green tea.`, then use the existing Pause/Send row. Microphone permission is requested only when recording starts.
+3. Start a conversation, switch to voice, record a short English sentence such as `I like green tea.`, then use the green control’s integrated Pause to end capture. Tap Play in that same control to listen, tap again to pause/resume playback, and use Send to commit. The separate left Restart button discards the unsent take and records again from zero; it does not append audio to the old take. Microphone permission is requested only when recording starts.
 4. The sent recording is saved first. The existing loading oval now covers transcription as well as the subsequent partner response. First use may need network access to download the English model; the caption explains this. Voice audio itself stays local.
 5. Expect the recognized text in the existing green learner bubble, then an actual text partner reply. Play must still use the original saved recording. Switching the composer must not change the bubble color. Opening overall statistics should show sentence/word/vocabulary results and, after successful grammar evaluation, scored grammar opportunities. The same message counts as ONE practice attempt.
 6. Edit the most recent recording using the existing replacement-recording flow. A replacement is a new immutable message version with its own transcript, reply target, and analysis; both versions count fully. The original recording/transcript remains stored, and the feed displays the latest version.
@@ -49,7 +49,7 @@ On the physical iPhone/iPad, check:
 
 1. Select a live partner text reply, tap Play, pause mid-sentence, resume, let it finish, then replay. The existing action highlights while active and VoiceOver labels it “暂停播放”. The original text bubble stays visible; no recording duration or fake progress card is added.
 2. Play a different reply while speech is active. Only the new reply should speak. Preview/play a learner recording and then play a partner reply; these audio sources must replace each other.
-3. Start recording during partner speech. Speech must stop before microphone permission/recording, and must not resume when recording ends. Review/Pause/Send and learner recording playback must still work. Partner Play remains unavailable while a recording draft exists.
+3. Start recording during partner speech. Speech must stop before microphone permission/recording, and must not resume when recording ends. The integrated capture-stop/play/pause, separate Restart, Send and learner recording playback must still work. Partner Play remains unavailable while a recording draft exists.
 4. While speech is active or paused, open history/settings/statistics, switch conversations, or background/lock the app. Speech must stop. Also check an incoming audio interruption and headphone disconnection. Returning must not resume it automatically.
 5. Blue system exchanges stay text-only; typed learner messages do not gain synthesized playback. Repeat playback and reopening history must not create messages/edits or change practice statistics. A failed voice/audio-session attempt must retain the reply and permit another tap to retry.
 6. Check speaker and headphones, offline playback with an available English voice, larger Dynamic Type, and VoiceOver action/selection announcements. Voice availability and voice quality depend on the device/system voice assets.
@@ -57,3 +57,16 @@ On the physical iPhone/iPad, check:
 Two focused XCTest cases cover saved-text/history eligibility, exclusions for system/learner/unfinished messages, and blocking playback during a microphone request without invoking native speech. The live-reply test also checks Play availability and absence of automatic playback or fabricated recording data. Actual synthesis, pause/resume, audio routing and lifecycle checks require Xcode and physical hardware; these tests do not replace them.
 
 Apple references: [AVSpeechSynthesizer](https://developer.apple.com/documentation/avfaudio/avspeechsynthesizer), [application audio-session ownership](https://developer.apple.com/documentation/avfaudio/avspeechsynthesizer/usesapplicationaudiosession), [speech delegate lifecycle](https://developer.apple.com/documentation/avfaudio/avspeechsynthesizerdelegate).
+
+## Recording-control refinement
+
+The user confirmed voice capture works and requested a clearer, consolidated recording row. While capturing, the green indicator now shows a white waveform at full opacity, a Pause glyph and “录音中” with elapsed seconds. Waveform height responds to real microphone level; it never fades at silence. Reduce Motion keeps its height static.
+
+1. Start recording and speak, then remain silent briefly: the waveform/text must stay clearly visible in both cases.
+2. Tap Pause INSIDE the green indicator: capture ends, the file finalizes, and the glyph becomes Play. No preview starts automatically.
+3. Tap Play there to listen; tap again to pause, then resume. This must never reopen the microphone or append to the take. Once playback finishes, Play replays from the beginning.
+4. Tap the separate left Restart control while capturing, reviewing or playing: discard the entire unsent take, stop playback, reset elapsed time and start fresh capture. The control is unavailable during permission/file processing. Keyboard/navigation/background cancellation and microphone denial must still behave normally.
+5. Repeat this while editing the most recent recorded message: Restart must keep the edit target. Sending creates only the intended replacement version; the original audio/message remains retained. Sending/restarting must not create an extra practice attempt before a successful commit.
+6. Check the 320-point phone width, iPad, landscape, large Dynamic Type and VoiceOver labels. Controls must remain reachable with at least 44-point targets. Send remains usable directly from capture as well as after preview; failed saves retain the finalized unsent take.
+
+Two additional injected XCTest cases cover stale permission cancellation across Restart/leave and preservation of the recorded edit target/original audio. They do not request microphone access. Actual capture-stop/play/pause/restart and appearance require physical-device/Xcode checks.

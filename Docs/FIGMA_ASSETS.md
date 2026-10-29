@@ -89,3 +89,9 @@ Source: [navigation frame 41:644](https://www.figma.com/design/jVSZ8R37YkVCJOC32
 | MenuOpenGlyph | `41:657` | 32.001 × 19.6759 | Cream hamburger glyph, centered over MenuOpenRing |
 
 All four original SVG exports were downloaded and converted to vector PDFs with the same librsvg/Cairo process, unchanged viewport dimensions and paths. Asset catalogs retain vector representations. Their original 59.16098-point ring layer plus its 4.09% export margins maps to the 64-point rendered ring; glyphs keep their original proportions and native size. No temporary Figma URL appears at runtime. Existing brown composer/message controls, PaperTexture, dashboard colors/charts and other artwork are unchanged. Source/project/asset checks do not replace Xcode rendering comparison.
+
+## User-directed recording controls — 2026-10-29
+
+This follow-up explicitly changes the recording-row interaction after the user reported working capture. Pause/Play now appears inside the existing green waveform surface, rendered white from the original PauseGlyph/PlayGlyph with preserved aspect ratio. The separate left control reuses RepeatGlyph at 32 points wide and proportional height over the 64-point ControlRing for Restart. The waveform retains RecordingWaveLead/RecordingWaveTrail, uses white template rendering at full opacity, and responds to real microphone level through height (static under Reduce Motion). No asset file, dependency, screen, statistics UI or navigation artwork changes. This supersedes the earlier pause/review/resume-capture interaction recorded above.
+
+The user also explicitly requested a visible typed-message Send control. The text box now reuses SendAudioGlyph with ControlRing in a 44-point target (glyph scales proportionally from the 64-point source). It shares the normal/blue input surface and preserves the separate microphone control. No new asset or replacement symbol is introduced.

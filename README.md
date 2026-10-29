@@ -10,6 +10,10 @@ On-device English recognition is now implemented for newly sent recordings and r
 
 Navigation now uses one red menu button across conversation, settings and statistics screens. The Figma navy drawer combines 开始新对话, 学习进度, Conversation Settings and saved history. Per-conversation statistics controls remain unavailable. The overall dashboard content is unchanged; its header opens the same menu.
 
+Typed input now has a visible Send arrow inside the text box, including blue system-message mode and edits; Return remains supported where the keyboard provides it.
+
+The recording row now keeps its waveform clearly visible during capture. Pause inside the green indicator ends capture; subsequent taps play/pause the take. The separate Restart button discards the unsent take and begins again from zero.
+
 Partner text replies now support on-demand English playback using Apple’s built-in voice. Select a reply and tap Play; tap again to pause/resume, or replay after it finishes. Recording or leaving the feed stops playback. Blue system replies stay text-only. This client update needs no Cloudflare deployment or new key; actual voice playback still needs device testing. See [speech checks](Docs/SPEECH_RECOGNITION.md#partner-reply-playback).
 
 The OpenAI key stays in Cloudflare. Private Debug runs use a separate beta token; Release builds do not embed shared credentials. Tests/previews retain isolated offline fixtures. Pronunciation scoring, cloud-generated partner voices, clause/vocabulary judgment, and production account authentication remain future work.

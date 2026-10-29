@@ -431,3 +431,26 @@ The user replaced the always-visible three-button navigation with one Menu butto
 - [ ] Build and execute navigation UI tests on the Mac. On iPhone/iPad check each menu destination, closing via the filled button/outside tap/VoiceOver escape, draft/settings preservation, new-conversation reset/history persistence, long history scrolling, short landscape, Dynamic Type, Reduce Motion and VoiceOver. Confirm all statistics content and selected grammar behavior still match the current app.
 
 Validation: `git diff --check` passed. All 32 app/11 unit-test/three UI-test Swift sources are referenced once in the correct targets; the project parses and every reference exists. Compared with the pre-navigation snapshot, the project file changes only the drawer filename. All four bundled menu PDFs are nonempty and match their source viewport dimensions; the shared button composes each 64-point ring with its 32.001 × 19.6759-point glyph. The entire statistics body below its header is byte-for-byte unchanged. The attempted generic simulator build failed with `xcodebuild: command not found` (exit 127); no compilation, UI-test pass or actual SwiftUI visual comparison is claimed. Physical-device/Xcode checks above remain pending. No backend deployment or new secret is needed.
+
+## Recording-control follow-up (implemented; device testing pending)
+
+The user confirmed recording works and asked for a clear capture indicator, integrated play/pause inside the green waveform, and a separate Restart button replacing the old Pause/resume-capture control.
+
+- [x] Keep capture waveform/text at full opacity with a visible “录音中” label; use real microphone level to vary waveform height and honor Reduce Motion. Enable the central control during recording instead of visually disabling it.
+- [x] Put original Pause/Play artwork inside that surface: end capture/finalize first, then play/pause/resume/replay the finalized take. Do not resume or append capture from review. Preserve Send, processing/permission guards and the current visual surfaces.
+- [x] Replace the separate Pause button with proportional original Repeat artwork for Restart. Cancel capture/playback and stale permission/finalization, delete the unsent take, reset elapsed time/meter and start fresh. Preserve recorded-edit identity and all committed original audio/messages; only sending commits a practice attempt.
+- [x] Add two focused injected XCTest cases for restart/leave permission races and recorded-edit/audio preservation; update the idle recording-row UI assertions and current documentation. No backend, asset, project-setting, navigation or statistics change.
+- [ ] Build/run ConversationAudioTests and speech/history regressions on the Mac. On device verify capture visibility at silence, stop then play/pause/replay, Restart during recording/review/playback, Send and failed-save recovery, recorded edits, keyboard/navigation/background cancellation, small width/iPad/landscape, Dynamic Type and VoiceOver. Use [the recording checklist](Docs/SPEECH_RECOGNITION.md#recording-control-refinement).
+
+Validation: `git diff --check` and project/reference checks passed (32 app, 11 unit-test and three UI-test Swift files registered once). All seven reused recording artwork assets are nonempty and unchanged. StatisticsDashboardView, root navigation and the Xcode project are byte-for-byte unchanged from HEAD. The attempted generic simulator build failed with `xcodebuild: command not found` (exit 127). No compilation, XCTest pass or actual recording-row rendering/playback/restart acceptance is claimed; the linked device checks remain pending.
+
+## Typed Send button follow-up (implemented; device testing pending)
+
+The user reported that typed messages had no visible Send control. The multiline field previously relied on keyboard submission.
+
+- [x] Add a visible, 44-point Send button inside the input surface using the original SendAudioGlyph/ControlRing. Keep the system-message toggle, microphone switch, blue-system input styling, and multiline input.
+- [x] Share the existing submitDraft path with keyboard submission for normal text, recorded-fixture transcript edits, text edits and system requests. Disable blank/whitespace and pending-work sends; retain text on failed submission.
+- [x] Add an isolated UI regression that sends typed and system messages by tapping the button, without Return, and checks whitespace gating and the microphone/system-mode controls.
+- [ ] Build on Mac and run the UI regression. On iPad/iPhone check the Send arrow with software/hardware keyboard, multiline input, editing, system mode, pending replies, failed-send retention and small-width/Dynamic Type layout.
+
+Validation: `git diff --check` and project/reference checks passed (32 app, 11 unit-test and three UI-test Swift files, each registered once). The generic simulator build attempt returned `xcodebuild: command not found` (exit 127). No Swift compilation, UI-test pass or device rendering result is claimed. No backend deployment, new dependency, asset or project setting is required.

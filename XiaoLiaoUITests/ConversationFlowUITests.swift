@@ -6,6 +6,42 @@ final class ConversationFlowUITests: XCTestCase {
     }
 
     @MainActor
+    func testVisibleSendButtonSubmitsTypedAndSystemMessagesWithoutReturn() {
+        let app = XCUIApplication.isolatedHistoryApp()
+        app.launch()
+        app.buttons["conversation.suggest"].tap()
+        app.buttons["conversation.start"].tap()
+        app.buttons["conversation.keyboard"].tap()
+        let draft = app.descendants(matching: .any)["conversation.draft"].firstMatch
+        let send = app.buttons["conversation.sendText"]
+        XCTAssertTrue(send.waitForExistence(timeout: 5))
+        XCTAssertFalse(send.isEnabled)
+        draft.tap()
+        draft.typeText("   ")
+        XCTAssertFalse(send.isEnabled)
+        let typedMessage = "Hello from the Send button."
+        draft.typeText(typedMessage)
+        XCTAssertTrue(send.isEnabled)
+        send.tap()
+        let sent = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@",
+                                                    "message.", typedMessage)).firstMatch
+        XCTAssertTrue(sent.waitForExistence(timeout: 5))
+        XCTAssertFalse(send.isEnabled)
+        XCTAssertTrue(app.buttons["conversation.microphone"].isEnabled)
+
+        app.buttons["conversation.systemMode"].tap()
+        XCTAssertFalse(app.buttons["conversation.microphone"].isEnabled)
+        let systemRequest = "Please use simpler words."
+        draft.tap()
+        draft.typeText(systemRequest)
+        XCTAssertTrue(send.isEnabled)
+        send.tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", systemRequest))
+            .firstMatch.waitForExistence(timeout: 5))
+        XCTAssertEqual(app.buttons["conversation.systemMode"].value as? String, "未选择")
+    }
+
+    @MainActor
     private func fixtureBubble(_ suffix: String, in app: XCUIApplication) -> XCUIElement {
         app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND identifier ENDSWITH %@",
                                          "message.", "." + suffix)).firstMatch
@@ -184,7 +220,8 @@ final class ConversationFlowUITests: XCTestCase {
         let learnerTranslation = app.buttons["action.\(learnerID).translate"]
         let transcript = app.buttons["action.\(audioID).transcribe"]
         XCTAssertTrue(app.buttons["conversation.record"].isEnabled)
-        XCTAssertFalse(app.buttons["conversation.pauseRecording"].exists)
+        XCTAssertFalse(app.buttons["conversation.restartRecording"].exists)
+        XCTAssertFalse(app.buttons["conversation.recordingControl"].exists)
         XCTAssertFalse(app.buttons["conversation.sendRecording"].exists)
         XCTAssertFalse(learnerTranslation.exists)
         XCTAssertFalse(transcript.exists)
