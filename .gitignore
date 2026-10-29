@@ -60,3 +60,11 @@ fastlane/report.xml
 fastlane/Preview.html
 fastlane/screenshots/**/*.png
 fastlane/test_output
+
+# Backend tooling and local secrets
+Backend/node_modules/
+Backend/.wrangler/
+Backend/.dev.vars
+Backend/.dev.vars.*
+Backend/.env
+Backend/.env.*

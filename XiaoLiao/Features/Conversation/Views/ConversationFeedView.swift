@@ -35,6 +35,9 @@ struct ConversationFeedView: View {
                                 MessageRow(viewModel: viewModel, message: message)
                                     .id(message.logicalMessageID)
                             }
+                            if viewModel.pendingReply != nil {
+                                replyStatus.id("conversation.replyStatus")
+                            }
                         }
                         .padding(.top, 8)
                         .padding(.bottom, 28)
@@ -53,9 +56,14 @@ struct ConversationFeedView: View {
                     }
                     .scrollDismissesKeyboard(.interactively)
                     .onChange(of: viewModel.messages.count) { _, _ in
-                        if let id = viewModel.messages.last?.logicalMessageID {
+                        if viewModel.pendingReply != nil {
+                            proxy.scrollTo("conversation.replyStatus", anchor: .bottom)
+                        } else if let id = viewModel.messages.last?.logicalMessageID {
                             proxy.scrollTo(id, anchor: .bottom)
                         }
+                    }
+                    .onChange(of: viewModel.isGeneratingReply) { _, _ in
+                        if viewModel.pendingReply != nil { proxy.scrollTo("conversation.replyStatus", anchor: .bottom) }
                     }
                 }
             }
@@ -100,6 +108,47 @@ struct ConversationFeedView: View {
         .background { PaperBackground() }
     }
 
+    private var replyStatus: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 8) {
+                if viewModel.isGeneratingReply {
+                    FigmaImage(artwork: .audioOval)
+                        .frame(width: 209, height: 86)
+                        .overlay { Text("…").font(.largeTitle.bold()).foregroundStyle(XiaoLiaoTheme.ink) }
+                        .overlay(alignment: .bottomLeading) {
+                            FigmaImage(artwork: .audioTail)
+                                .frame(width: 17.2822, height: 23.3026)
+                                .rotationEffect(.degrees(-154.56))
+                                .offset(x: 10, y: -2)
+                        }
+                        .accessibilityLabel(viewModel.pendingReply?.request.kind == .system ? "小聊系统正在回复" : "对话伙伴正在回复")
+                        .accessibilityIdentifier("conversation.replyLoading")
+                } else {
+                    Text(viewModel.pendingReply?.failureMessage ?? "上次回复尚未完成，可以重试。")
+                        .font(.callout)
+                        .fixedSize(horizontal: false, vertical: true)
+                    HStack {
+                        Button("重试") { viewModel.retryReply() }
+                            .frame(minWidth: 44, minHeight: 44)
+                            .accessibilityIdentifier("conversation.retryReply")
+                        Spacer()
+                        Button("暂不重试") { viewModel.dismissFailedReply() }
+                            .frame(minWidth: 44, minHeight: 44)
+                            .accessibilityIdentifier("conversation.dismissReply")
+                    }
+                    .font(.callout.bold())
+                    .buttonStyle(.plain)
+                    .frame(minHeight: 44)
+                }
+            }
+            .frame(maxWidth: 225, alignment: .leading)
+            Spacer(minLength: 40)
+        }
+        .padding(.leading, 38)
+        .padding(.trailing, 24)
+        .accessibilityElement(children: .contain)
+    }
+
     private var voiceComposer: some View {
         VStack(spacing: 0) {
             Button { viewModel.beginRecording() } label: {
@@ -113,8 +162,8 @@ struct ConversationFeedView: View {
                     }
             }
             .buttonStyle(.plain)
-            .disabled(viewModel.audio.hasDraft)
-            .opacity(viewModel.audio.hasDraft ? 0.5 : 1)
+            .disabled(viewModel.audio.hasDraft || !viewModel.canSubmitMessage)
+            .opacity(viewModel.audio.hasDraft || !viewModel.canSubmitMessage ? 0.5 : 1)
             .accessibilityLabel("录音")
             .accessibilityHint("轻点开始录音；录音时可暂停试听或发送")
             .accessibilityIdentifier("conversation.record")
@@ -209,11 +258,13 @@ struct ConversationFeedView: View {
                 .background(viewModel.isSystemMessageMode ? XiaoLiaoTheme.systemRequest : .white)
                 .overlay { Rectangle().strokeBorder(.black, lineWidth: 1) }
                 .focused($isComposerFocused)
+                .disabled(!viewModel.canSubmitMessage)
                 .submitLabel(.send)
                 .onSubmit {
                     if viewModel.submitDraft() { isComposerFocused = false }
                 }
-                .accessibilityLabel(viewModel.isSystemMessageMode ? "向小聊发送系统消息（本地示例）" : viewModel.editingMessageID == nil ? "输入消息" : "编辑消息")
+                .accessibilityLabel(viewModel.isSystemMessageMode ? "向小聊发送系统消息" : viewModel.editingMessageID == nil ? "输入消息" : "编辑消息")
+                .accessibilityHint(viewModel.canSubmitMessage ? "" : "请等待回复，或处理失败的请求后继续")
                 .accessibilityIdentifier("conversation.draft")
 
             ArtworkButton(label: "返回语音输入", glyph: .microphoneGlyph, size: 53,
@@ -234,14 +285,14 @@ struct ConversationFeedView: View {
         ArtworkButton(
             label: viewModel.isSystemMessageMode ? "取消系统消息" : "联系小聊",
             glyph: .voiceModeGlyph, size: size,
-            isAvailable: !viewModel.audio.hasDraft,
-            unavailableHint: "请先发送或取消当前录音"
+            isAvailable: !viewModel.audio.hasDraft && viewModel.canSubmitMessage,
+            unavailableHint: "请先处理当前录音或等待中的回复"
         ) {
             viewModel.toggleSystemMessageMode()
             isComposerFocused = viewModel.inputMode == .text
         }
         .accessibilityValue(viewModel.isSystemMessageMode ? "已选择" : "未选择")
-        .accessibilityHint(viewModel.audio.hasDraft ? "请先发送或取消当前录音" : "将下一条文字消息发给小聊系统；再次轻点取消。目前使用本地示例回复。")
+        .accessibilityHint(viewModel.audio.hasDraft ? "请先发送或取消当前录音" : "将下一条文字消息发给小聊系统；再次轻点取消。")
         .accessibilityIdentifier("conversation.systemMode")
     }
 }

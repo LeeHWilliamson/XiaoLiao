@@ -44,6 +44,12 @@ nonisolated struct Message: Identifiable, Codable, Equatable, Sendable {
         let confidence: Double?
     }
 
+    struct Generation: Codable, Equatable, Sendable {
+        let requestID: String
+        let model: String
+        let promptVersion: String
+    }
+
     /// Unique ID of this exact version, not the whole edit chain.
     let id: String
     /// Stable across the edit chain; equals id on the original record.
@@ -65,13 +71,14 @@ nonisolated struct Message: Identifiable, Codable, Equatable, Sendable {
     let status: Status?
     /// Nil on older prototype records whose provenance was not recorded.
     let origin: Origin?
+    let generation: Generation?
 
     init(id: String = UUID().uuidString, logicalMessageID: String? = nil,
          replacesMessageID: String? = nil, conversationID: String, createdAt: Date = Date(),
          senderRole: SenderRole, purpose: Purpose = .conversationPractice,
          modality: Modality, content: Content, replyToMessageID: String? = nil,
          revision: Int = 1, transcription: Transcription? = nil, status: Status? = .complete,
-         origin: Origin? = .interaction) {
+         origin: Origin? = .interaction, generation: Generation? = nil) {
         self.id = id
         self.logicalMessageID = logicalMessageID ?? id
         self.replacesMessageID = replacesMessageID
@@ -86,6 +93,7 @@ nonisolated struct Message: Identifiable, Codable, Equatable, Sendable {
         self.transcription = transcription
         self.status = status
         self.origin = origin
+        self.generation = generation
     }
 
     /// Derived from the chain link so a separate stored flag cannot disagree.
@@ -103,7 +111,8 @@ nonisolated struct Message: Identifiable, Codable, Equatable, Sendable {
                        conversationID: conversationID, createdAt: createdAt, senderRole: senderRole,
                        purpose: purpose, modality: modality,
                        content: .audio(AudioAttachment(storageKey: storageKey, durationSeconds: attachment.durationSeconds)),
-                       replyToMessageID: replyToMessageID, revision: revision, transcription: transcription, status: status, origin: origin)
+                       replyToMessageID: replyToMessageID, revision: revision, transcription: transcription, status: status, origin: origin,
+                       generation: generation)
     }
 
     func edited(content: Content, transcription: Transcription? = nil) -> Message {

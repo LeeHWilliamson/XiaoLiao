@@ -12,6 +12,34 @@ final class ConversationFlowUITests: XCTestCase {
     }
 
     @MainActor
+    func testSentTextAutomaticallyAppearsInOverallSentenceStatisticsAfterRelaunch() {
+        let app = XCUIApplication.isolatedHistoryApp()
+        app.launch()
+        app.buttons["conversation.suggest"].tap()
+        app.buttons["conversation.start"].tap()
+        app.buttons["conversation.keyboard"].tap()
+        let draft = app.descendants(matching: .any)["conversation.draft"].firstMatch
+        XCTAssertTrue(draft.waitForExistence(timeout: 5))
+        draft.tap()
+        draft.typeText("Run runs running.\n")
+        app.buttons["conversation.statistics"].tap()
+        let sentence = app.descendants(matching: .any)["stats.activity.sentences"].firstMatch
+        XCTAssertTrue(app.buttons["stats.grammar.category.verb-tense"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["stats.empty"].exists)
+        scrollTo(sentence, in: app)
+        XCTAssertTrue(sentence.isHittable)
+        XCTAssertTrue(sentence.label.contains("1"))
+        XCTAssertFalse(sentence.label.contains("—"))
+        app.terminate()
+        app.launch()
+        app.buttons["conversation.statistics"].tap()
+        XCTAssertTrue(app.buttons["stats.grammar.category.verb-tense"].waitForExistence(timeout: 5))
+        scrollTo(sentence, in: app)
+        XCTAssertTrue(sentence.isHittable)
+        XCTAssertTrue(sentence.label.contains("1"))
+    }
+
+    @MainActor
     func testOverallStatisticsEmptySelectionAndReturnPreserveThePrompt() {
         let app = XCUIApplication.isolatedHistoryApp()
         app.launch()

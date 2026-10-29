@@ -5,6 +5,7 @@ struct StatisticsDashboardView: View {
     let conversation: ConversationViewModel
     let onBack: () -> Void
     @State private var dashboard: StatisticsDashboardModel
+    @Environment(\.scenePhase) private var scenePhase
     @ScaledMetric(relativeTo: .largeTitle) private var titleSize: CGFloat = 34
     @ScaledMetric(relativeTo: .body) private var chartHeight: CGFloat = 235
 
@@ -68,6 +69,9 @@ struct StatisticsDashboardView: View {
         .toolbar(.hidden, for: .navigationBar)
         .accessibilityIdentifier("stats.screen")
         .task { await load() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await load() } }
+        }
     }
 
     private func load() async {

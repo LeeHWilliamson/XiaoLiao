@@ -17,6 +17,15 @@ enum StatisticsPreviewData {
         for day in 0..<12 {
             guard let date = calendar.date(byAdding: .day, value: day - 11, to: today) else { continue }
             let id = "statistics-preview-\(day)"
+            if day == 5 {
+                // A genuine missing-text case stays a gap when automatic text
+                // analysis runs. This placeholder is never played or persisted.
+                let audio = Message(id: id + ".message", conversationID: id, createdAt: date.addingTimeInterval(12 * 3600),
+                                    senderRole: .user, modality: .spoken,
+                                    content: .audio(.init(storageKey: UUID().uuidString + ".caf", durationSeconds: 3)))
+                sessions.append(ConversationSession(id: id, title: "预览数据", prompt: "预览数据", messages: [audio], settings: .init()))
+                continue
+            }
             let sentence = "I enjoy learning about \(topics[day]) because they make our world interesting"
             let sentences = [sentence, "We explore their habitats and discuss how nature changes over time",
                              "My friend enjoys sharing wonderful stories about travel and wildlife",
@@ -27,16 +36,14 @@ enum StatisticsPreviewData {
                                   senderRole: .user, modality: .written, content: .text(text))
             guard let analysis = try LocalTextAnalyzer.analyze(message) else { continue }
             var session = ConversationSession(id: id, title: "预览数据", prompt: "预览数据", messages: [message], settings: .init())
-            if day != 5 {
-                session.textAnalyses = [MessageTextAnalysis(metadata: analysis.metadata,
-                    normalizationVersion: analysis.normalizationVersion, words: analysis.words, sentenceSpans: analysis.sentenceSpans,
-                    clauses: .init(count: 9 + day % 4, provenance: provenance))]
-            }
+            session.textAnalyses = [MessageTextAnalysis(metadata: analysis.metadata,
+                normalizationVersion: analysis.normalizationVersion, words: analysis.words, sentenceSpans: analysis.sentenceSpans,
+                clauses: .init(count: 9 + day % 4, provenance: provenance))]
             let opportunities = GrammarObservation.TrackedCategory.allCases.enumerated().flatMap { categoryIndex, category in
                 (0..<10).map { index in
                     GrammarObservation.Opportunity(id: "\(category.rawValue)-\(index)", category: category.observationCategory,
                         textSpan: analysis.words[(categoryIndex * 10 + index) % analysis.words.count].textSpan,
-                        outcome: day == 5 ? .uncertain : (index < min(9, 4 + day / 3 + categoryIndex % 3) ? .correct : .incorrect),
+                        outcome: index < min(9, 4 + day / 3 + categoryIndex % 3) ? .correct : .incorrect,
                         suggestedCorrection: nil, explanation: nil, confidence: nil)
                 }
             }

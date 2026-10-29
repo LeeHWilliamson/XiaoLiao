@@ -4,6 +4,8 @@ import Observation
 @MainActor
 @Observable
 final class ConversationViewModel {
+    typealias TextAnalyzer = @Sendable (Message) async throws -> MessageTextAnalysis?
+    typealias ReplyGenerator = @Sendable (ConversationReplyRequest) async throws -> ConversationReplyResponse
     enum InputMode: Equatable { case voice, text }
     enum Detail: Equatable { case transcript, translation, playback }
 
@@ -18,6 +20,19 @@ final class ConversationViewModel {
     @ObservationIgnored private var storageDirectory: URL?
     @ObservationIgnored private var isStorageReady = false
     @ObservationIgnored private var isRestoringSettings = false
+    @ObservationIgnored private let textAnalyzer: TextAnalyzer
+    @ObservationIgnored private var textAnalysisTask: Task<Void, Never>?
+    @ObservationIgnored private var textAnalysisJobs: [Message] = []
+    @ObservationIgnored private var queuedTextMessageIDs: Set<String> = []
+    @ObservationIgnored private let replyGenerator: ReplyGenerator?
+    @ObservationIgnored private var replyTasks: [String: Task<Void, Never>] = [:]
+    private(set) var generatingSessionIDs: Set<String> = []
+    var replyIssue: String?
+
+    var usesLiveReplies: Bool { replyGenerator != nil }
+    var pendingReply: PendingConversationReply? { history.first { $0.id == activeSessionID }?.pendingReply }
+    var isGeneratingReply: Bool { activeSessionID.map { generatingSessionIDs.contains($0) } ?? false }
+    var canSubmitMessage: Bool { pendingReply == nil }
 
     var prompt = ""
     var draft = ""
@@ -46,21 +61,29 @@ final class ConversationViewModel {
     private(set) var editingMessageID: String?
     private(set) var details: [String: Detail] = [:]
 
-    init(history: [ConversationSession]? = nil, audio: ConversationAudioController? = nil) {
+    init(history: [ConversationSession]? = nil, audio: ConversationAudioController? = nil,
+         textAnalyzer: TextAnalyzer? = nil, replyGenerator: ReplyGenerator? = nil) {
         self.history = history ?? MockConversation.history
         self.audio = audio ?? ConversationAudioController()
+        self.replyGenerator = replyGenerator
+        self.textAnalyzer = textAnalyzer ?? { message in
+            try await Task.detached(priority: .utility) { try LocalTextAnalyzer.analyze(message) }.value
+        }
+        retryPendingTextAnalyses()
     }
 
     /// The app opts into disk storage explicitly; tests and previews stay isolated.
-    static func persistent(directory: URL? = nil, audio: ConversationAudioController? = nil) -> ConversationViewModel {
-        let model = ConversationViewModel(history: [], audio: audio)
+    static func persistent(directory: URL? = nil, audio: ConversationAudioController? = nil,
+                           textAnalyzer: TextAnalyzer? = nil, replyGenerator: ReplyGenerator? = nil) -> ConversationViewModel {
+        let model = ConversationViewModel(history: [], audio: audio, textAnalyzer: textAnalyzer, replyGenerator: replyGenerator)
         model.storageDirectory = directory ?? ConversationHistoryStore.defaultDirectory
         model.retryLoadingHistory()
         return model
     }
 
-    static func persistent(store: ConversationHistoryStore, audio: ConversationAudioController? = nil) -> ConversationViewModel {
-        let model = ConversationViewModel(history: [], audio: audio)
+    static func persistent(store: ConversationHistoryStore, audio: ConversationAudioController? = nil,
+                           textAnalyzer: TextAnalyzer? = nil, replyGenerator: ReplyGenerator? = nil) -> ConversationViewModel {
+        let model = ConversationViewModel(history: [], audio: audio, textAnalyzer: textAnalyzer, replyGenerator: replyGenerator)
         model.storageDirectory = store.directory
         model.historyStore = store
         model.retryLoadingHistory()
@@ -79,6 +102,7 @@ final class ConversationViewModel {
                 guard let attachment = $0.audioAttachment, let url = store.recordingURL(for: attachment.storageKey) else { return false }
                 return !FileManager.default.fileExists(atPath: url.path)
             }) ? StorageIssue(message: "部分录音文件暂不可用。对话文字和设置仍已保留。") : nil
+            retryPendingTextAnalyses()
         } catch {
             isStorageReady = false
             storageIssue = StorageIssue(message: "无法读取本地历史。已有数据未被清除。请稍后重试。", canRetryLoading: true)
@@ -95,13 +119,17 @@ final class ConversationViewModel {
     func startConversation() -> Bool {
         guard canStart else { return false }
         let sessionID = UUID().uuidString
-        let session = ConversationSession(
+        var session = ConversationSession(
             id: sessionID,
             title: prompt == MockConversation.prompt ? "乌龟" : String(prompt.trimmingCharacters(in: .whitespacesAndNewlines).prefix(12)),
             prompt: prompt,
-            messages: MockConversation.messages(conversationID: sessionID, createdAt: Date()),
+            messages: usesLiveReplies ? [] : MockConversation.messages(conversationID: sessionID, createdAt: Date()),
             settings: settings
         )
+        if usesLiveReplies {
+            do { session.pendingReply = .init(request: try ConversationReplyRequest(session: session), failureMessage: nil) }
+            catch { replyIssue = error.localizedDescription; return false }
+        }
         guard let saved = persist(session) else { return false }
         activeSessionID = nil
         messageVersions = saved.messages
@@ -111,6 +139,7 @@ final class ConversationViewModel {
         resetPresentation()
         history.insert(saved, at: 0)
         activeSessionID = saved.id
+        launchReply(in: saved.id)
         return true
     }
 
@@ -215,25 +244,29 @@ final class ConversationViewModel {
     @discardableResult
     func submitDraft() -> Bool {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, !audio.hasDraft else { return false }
+        guard !text.isEmpty, !audio.hasDraft, canSubmitMessage else { return false }
         if isSystemMessageMode { return submitSystemMessage(text) }
         guard let sessionID = activeSessionID else { return false }
         var updated = messageVersions
+        let submitted: Message
         if let id = editingMessageID {
             guard canEditMessage(id), let original = messages.first(where: { $0.id == id }),
                   original.audioAttachment == nil, case .text = original.content else { return false }
             let transcript: Message.Transcription? = original.modality == .spoken ? .init(text: text, confidence: nil) : nil
-            updated.append(original.edited(content: .text(text), transcription: transcript))
+            submitted = original.edited(content: .text(text), transcription: transcript)
         } else {
-            updated.append(Message(conversationID: sessionID, senderRole: .user, modality: .written,
-                                   content: .text(text), replyToMessageID: lastPartnerMessageID))
+            submitted = Message(conversationID: sessionID, senderRole: .user, modality: .written,
+                                content: .text(text), replyToMessageID: lastPartnerMessageID)
         }
-        guard commitMessages(updated) else { return false }
+        updated.append(submitted)
+        guard commitTurn(updated, replyingTo: submitted) else { return false }
         if let id = editingMessageID { details[id] = nil }
         audio.stopPlayback()
         draft = ""
         editingMessageID = nil
         selectedMessageID = nil
+        enqueueTextAnalysis(submitted)
+        launchReply(in: sessionID)
         return true
     }
 
@@ -251,7 +284,7 @@ final class ConversationViewModel {
     }
 
     func beginRecording() {
-        guard activeSessionID != nil, !audio.hasDraft, !isSystemMessageMode else { return }
+        guard activeSessionID != nil, !audio.hasDraft, !isSystemMessageMode, canSubmitMessage else { return }
         draft = ""
         editingMessageID = nil
         selectedMessageID = nil
@@ -276,7 +309,7 @@ final class ConversationViewModel {
     /// after asynchronous work so navigation or a later message cannot replace the wrong reply.
     @discardableResult
     func commitRecording(_ clip: LocalAudioClip, in sessionID: String, replacing id: String? = nil) -> Bool {
-        guard !isSystemMessageMode, activeSessionID == sessionID, clip.duration.isFinite, clip.duration > 0, clip.duration < Double(Int.max) / 2,
+        guard canSubmitMessage, !isSystemMessageMode, activeSessionID == sessionID, clip.duration.isFinite, clip.duration > 0, clip.duration < Double(Int.max) / 2,
               FileManager.default.fileExists(atPath: clip.url.path) else { return false }
         var updated = messageVersions
         let key = clip.url.lastPathComponent
@@ -322,7 +355,7 @@ final class ConversationViewModel {
     }
 
     func toggleSystemMessageMode() {
-        guard activeSessionID != nil, !audio.hasDraft else { return }
+        guard activeSessionID != nil, !audio.hasDraft, canSubmitMessage else { return }
         audio.stopPlayback()
         selectedMessageID = nil
         if isSystemMessageMode {
@@ -343,6 +376,18 @@ final class ConversationViewModel {
     }
 
     private func submitSystemMessage(_ text: String) -> Bool {
+        if usesLiveReplies {
+            guard let sessionID = activeSessionID else { return false }
+            let request = Message(conversationID: sessionID, senderRole: .user, purpose: .systemAssistance,
+                                  modality: .written, content: .text(text))
+            guard commitTurn(messageVersions + [request], replyingTo: request) else { return false }
+            draft = ""
+            selectedMessageID = nil
+            editingMessageID = nil
+            endSystemMessageMode()
+            launchReply(in: sessionID)
+            return true
+        }
         let response = MockConversation.systemResponse(for: text, settings: settings)
         var updatedSettings = settings
         if let vocabulary = response.vocabulary { updatedSettings.vocabulary = vocabulary }
@@ -383,6 +428,8 @@ final class ConversationViewModel {
         guard let index = history.firstIndex(where: { $0.id == session.id }),
               let saved = persist(session) else { return false }
         history[index] = saved
+        // Network completions belong to their own conversation, even after navigation.
+        guard activeSessionID == saved.id else { return true }
         messageVersions = saved.messages
         grammarObservations = saved.grammarObservations
         vocabularyObservations = saved.vocabularyObservations
@@ -422,16 +469,103 @@ final class ConversationViewModel {
         return commitSession(session)
     }
 
-    /// Extract supplied analysis into a fresh snapshot, without blocking UI or
-    /// mutating conversation data. Future statistics views can request this.
+    /// Retry missing local analyses before capturing a fresh report. Failed
+    /// analysis leaves coverage incomplete; it never turns into a fabricated zero.
     func statisticsSnapshot(configuration: StatisticsConfiguration = .init(), interval: DateInterval? = nil,
                             calendar: Calendar = .current) async throws -> StatisticsSnapshot {
+        guard storageDirectory == nil || isStorageReady else { throw CocoaError(.fileReadUnknown) }
+        retryPendingTextAnalyses()
+        await waitForPendingTextAnalyses()
+        try Task.checkCancellation()
         guard storageDirectory == nil || isStorageReady else { throw CocoaError(.fileReadUnknown) }
         let sessions = history
         return try await Task.detached(priority: .utility) {
             try StatisticsCalculator.snapshot(sessions: sessions, configuration: configuration,
                                               interval: interval, calendar: calendar)
         }.value
+    }
+
+    /// The committed message is the durable work item. A missing result survives
+    /// a crash/relaunch without a second job store or migration. Each trigger
+    /// attempts an ID at most once; failures wait for a later trigger.
+    func retryPendingTextAnalyses() {
+        guard storageDirectory == nil || isStorageReady else { return }
+        for session in history {
+            let analyzedIDs = Set(session.textAnalyses.map { $0.metadata.messageID })
+            for message in session.messages where !analyzedIDs.contains(message.id) {
+                enqueueTextAnalysis(message)
+            }
+        }
+    }
+
+    /// Also used by focused tests to await the real asynchronous pipeline.
+    func waitForPendingTextAnalyses() async {
+        while let task = textAnalysisTask { await task.value }
+    }
+
+    private func enqueueTextAnalysis(_ message: Message) {
+        guard message.countsAsPractice, case .text = message.content,
+              !queuedTextMessageIDs.contains(message.id) else { return }
+        queuedTextMessageIDs.insert(message.id)
+        textAnalysisJobs.append(message)
+        guard textAnalysisTask == nil else { return }
+        textAnalysisTask = Task { [weak self] in
+            guard let self else { return }
+            await self.drainTextAnalysisJobs()
+        }
+    }
+
+    private func drainTextAnalysisJobs() async {
+        var next = 0
+        while next < textAnalysisJobs.count {
+            let message = textAnalysisJobs[next]
+            next += 1
+            if stillNeedsTextAnalysis(message) {
+                do {
+                    if let analysis = try await textAnalyzer(message) {
+                        saveAutomaticTextAnalysis(analysis, for: message)
+                    }
+                } catch {
+                    // Sending already succeeded. The missing result is retried on
+                    // foregrounding, reopening statistics, or the next launch.
+                }
+            }
+            queuedTextMessageIDs.remove(message.id)
+        }
+        textAnalysisJobs.removeAll(keepingCapacity: false)
+        textAnalysisTask = nil
+    }
+
+    private func stillNeedsTextAnalysis(_ message: Message) -> Bool {
+        guard let session = history.first(where: { $0.id == message.conversationID }) else { return false }
+        return session.messages.contains(message) && !session.textAnalyses.contains { $0.metadata.messageID == message.id }
+    }
+
+    private func saveAutomaticTextAnalysis(_ analysis: MessageTextAnalysis, for message: Message) {
+        guard analysis.metadata.messageID == message.id, analysis.metadata.messageRevision == message.revision,
+              analysis.metadata.conversationID == message.conversationID,
+              analysis.metadata.textSource == message.statisticsText?.source,
+              stillNeedsTextAnalysis(message),
+              let index = history.firstIndex(where: { $0.id == message.conversationID }) else { return }
+        // Merge into the latest committed session, not the snapshot captured before
+        // asynchronous extraction. Never overwrite newer messages/settings/results.
+        var session = history[index]
+        session.textAnalyses.append(analysis)
+        do {
+            try session.validate()
+            let saved: ConversationSession
+            if storageDirectory != nil {
+                guard isStorageReady, let historyStore else { return }
+                saved = try historyStore.save(session)
+            } else {
+                saved = session
+            }
+            history[index] = saved
+            if activeSessionID == saved.id { textAnalyses = saved.textAnalyses }
+        } catch {
+            // Preserve both the submitted message and any existing storage alert.
+            // An analysis write failure must not look like a failed chat send.
+        }
     }
 
     func translation(for message: Message) -> String? { MockConversation.translation(for: message) }
@@ -473,7 +607,7 @@ final class ConversationViewModel {
     }
 
     private func canEditMessage(_ id: String) -> Bool {
-        guard let latest = messages.last(where: { $0.senderRole == .user }),
+        guard canSubmitMessage, let latest = messages.last(where: { $0.senderRole == .user }),
               latest.id == id,
               latest.purpose == .conversationPractice, latest.revision < Int.max - 1 else { return false }
         return true
@@ -485,6 +619,93 @@ final class ConversationViewModel {
         details = [:]
         draft = ""
         editingMessageID = nil
-        inputMode = .voice
+        inputMode = usesLiveReplies ? .text : .voice
+        replyIssue = nil
+    }
+}
+
+extension ConversationViewModel {
+    private func commitTurn(_ updated: [Message], replyingTo message: Message) -> Bool {
+        guard usesLiveReplies else { return commitMessages(updated) }
+        guard let index = history.firstIndex(where: { $0.id == activeSessionID }) else { return false }
+        var session = history[index]
+        session.messages = updated
+        session.settings = settings
+        do {
+            session.pendingReply = .init(request: try ConversationReplyRequest(session: session, replyingTo: message), failureMessage: nil)
+        } catch {
+            replyIssue = error.localizedDescription
+            return false
+        }
+        return commitSession(session)
+    }
+
+    func retryReply() {
+        guard let id = activeSessionID else { return }
+        launchReply(in: id)
+    }
+
+    /// Cancels the wait after a failure, retaining the already committed learner message.
+    func dismissFailedReply() {
+        guard !isGeneratingReply, let index = history.firstIndex(where: { $0.id == activeSessionID }) else { return }
+        var session = history[index]
+        session.pendingReply = nil
+        _ = commitSession(session)
+    }
+
+    private func launchReply(in sessionID: String) {
+        guard let replyGenerator, replyTasks[sessionID] == nil,
+              let job = history.first(where: { $0.id == sessionID })?.pendingReply else { return }
+        generatingSessionIDs.insert(sessionID)
+        replyTasks[sessionID] = Task { [weak self] in
+            guard let self else { return }
+            defer {
+                self.generatingSessionIDs.remove(sessionID)
+                self.replyTasks[sessionID] = nil
+            }
+            do {
+                let response = try await replyGenerator(job.request)
+                try response.validate(for: job.request)
+                self.commitReply(response, for: job.request)
+            } catch {
+                self.recordReplyFailure(error, for: job.request)
+            }
+        }
+    }
+
+    private func commitReply(_ response: ConversationReplyResponse, for request: ConversationReplyRequest) {
+        guard let index = history.firstIndex(where: { $0.id == request.conversationID }),
+              history[index].pendingReply?.request == request else { return }
+        var session = history[index]
+        // A stable result ID plus an atomic message/job save prevents duplicate bubbles.
+        guard !session.messages.contains(where: { $0.id == request.requestID }) else { return }
+        let message = Message(id: request.requestID, conversationID: session.id,
+            senderRole: request.kind == .system ? .system : .aiPartner,
+            purpose: request.kind == .system ? .systemAssistance : .conversationPractice,
+            modality: .written, content: .text(response.text), replyToMessageID: request.replyToMessageID,
+            generation: .init(requestID: request.requestID, model: response.model, promptVersion: response.promptVersion))
+        session.messages.append(message)
+        session.pendingReply = nil
+        if request.kind == .system {
+            // Preserve controls changed by the person while the request was in flight.
+            if session.settings.tone == request.settings.tone { session.settings.tone = response.settings.tone }
+            if session.settings.vocabulary == request.settings.vocabulary { session.settings.vocabulary = response.settings.vocabulary }
+            if session.settings.replyLength == request.settings.replyLength { session.settings.replyLength = response.settings.replyLength }
+        }
+        // On save failure, keep the immutable pending request for explicit retry.
+        _ = commitSession(session)
+    }
+
+    private func recordReplyFailure(_ error: Error, for request: ConversationReplyRequest) {
+        guard let index = history.firstIndex(where: { $0.id == request.conversationID }),
+              history[index].pendingReply?.request == request else { return }
+        var session = history[index]
+        session.pendingReply?.failureMessage = (error as? ConversationReplyError)?.localizedDescription
+            ?? ConversationReplyError.unavailable.localizedDescription
+        _ = commitSession(session)
+    }
+
+    func waitForPendingReplies() async {
+        while let task = replyTasks.values.first { await task.value }
     }
 }

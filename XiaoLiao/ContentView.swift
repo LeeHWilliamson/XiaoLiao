@@ -59,8 +59,17 @@ struct ContentView: View {
         } message: {
             Text(conversation.storageIssue?.message ?? "")
         }
+        .alert("对话", isPresented: Binding(
+            get: { conversation.replyIssue != nil },
+            set: { if !$0 { conversation.replyIssue = nil } }
+        )) {
+            Button("好", role: .cancel) { conversation.replyIssue = nil }
+        } message: {
+            Text(conversation.replyIssue ?? "")
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .background { conversation.audio.interrupt() }
+            if phase == .active { conversation.retryPendingTextAnalyses() }
         }
         .onReceive(NotificationCenter.default.publisher(for: AVAudioSession.interruptionNotification)) { notification in
             if let raw = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,

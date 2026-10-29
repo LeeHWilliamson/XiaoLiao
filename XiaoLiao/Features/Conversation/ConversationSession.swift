@@ -10,10 +10,11 @@ nonisolated struct ConversationSession: Identifiable, Equatable, Codable, Sendab
     var grammarObservations: [GrammarObservation] = []
     var vocabularyObservations: [VocabularyObservation] = []
     var textAnalyses: [MessageTextAnalysis] = []
+    var pendingReply: PendingConversationReply?
 
     init(id: String, title: String, prompt: String, messages: [Message], settings: ConversationSettings,
          grammarObservations: [GrammarObservation] = [], vocabularyObservations: [VocabularyObservation] = [],
-         textAnalyses: [MessageTextAnalysis] = []) {
+         textAnalyses: [MessageTextAnalysis] = [], pendingReply: PendingConversationReply? = nil) {
         self.id = id
         self.title = title
         self.prompt = prompt
@@ -22,10 +23,11 @@ nonisolated struct ConversationSession: Identifiable, Equatable, Codable, Sendab
         self.grammarObservations = grammarObservations
         self.vocabularyObservations = vocabularyObservations
         self.textAnalyses = textAnalyses
+        self.pendingReply = pendingReply
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, title, prompt, messages, settings, grammarObservations, vocabularyObservations, textAnalyses
+        case id, title, prompt, messages, settings, grammarObservations, vocabularyObservations, textAnalyses, pendingReply
     }
 
     init(from decoder: any Decoder) throws {
@@ -38,6 +40,7 @@ nonisolated struct ConversationSession: Identifiable, Equatable, Codable, Sendab
         grammarObservations = try values.decode([GrammarObservation].self, forKey: .grammarObservations)
         vocabularyObservations = try values.decode([VocabularyObservation].self, forKey: .vocabularyObservations)
         textAnalyses = try values.decodeIfPresent([MessageTextAnalysis].self, forKey: .textAnalyses) ?? []
+        pendingReply = try values.decodeIfPresent(PendingConversationReply.self, forKey: .pendingReply)
     }
 
     var latestMessages: [Message] { Self.latestVersions(in: messages) }
@@ -96,8 +99,28 @@ nonisolated struct ConversationSession: Identifiable, Equatable, Codable, Sendab
             if let replyID = message.replyToMessageID {
                 guard records[replyID] != nil else { throw ValidationError.invalidMessage }
             }
+            if let generation = message.generation {
+                guard generation.requestID == message.id, UUID(uuidString: generation.requestID) != nil,
+                      message.senderRole != .user, message.modality == .written,
+                      message.status == .complete, message.origin == .interaction,
+                      !generation.model.isEmpty, !generation.promptVersion.isEmpty,
+                      case .text = message.content else { throw ValidationError.invalidMessage }
+            }
             records[message.id] = message
             latest[message.logicalMessageID] = message
+        }
+        if let request = pendingReply?.request {
+            guard UUID(uuidString: request.requestID) != nil, request.conversationID == id,
+                  request.prompt == prompt, records[request.requestID] == nil else { throw ValidationError.invalidMessage }
+            if let target = request.replyToMessageID {
+                guard let message = records[target], message.senderRole == .user,
+                      latest[message.logicalMessageID]?.id == target, request.messages.last?.id == target,
+                      request.kind == (message.purpose == .systemAssistance ? .system : .partner) else {
+                    throw ValidationError.invalidMessage
+                }
+            } else if !messages.isEmpty || !request.messages.isEmpty || request.kind != .partner {
+                throw ValidationError.invalidMessage
+            }
         }
         guard Set(grammarObservations.map(\.id)).count == grammarObservations.count,
               Set(grammarObservations.map { $0.metadata.messageID }).count == grammarObservations.count,

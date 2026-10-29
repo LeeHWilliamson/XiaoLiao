@@ -47,6 +47,9 @@
 		8A39236C84775454DC44FA9C /* StatisticsDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07E057E57DD6339F7BC73201 /* StatisticsDashboardView.swift */; };
 		F09E82B45F09E05C58CB59C6 /* StatisticsPreviewData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4888259F4A407112658E6A31 /* StatisticsPreviewData.swift */; };
 		2FF005680C39655F51886202 /* StatisticsDashboardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 514841E0A773B87B4F2A12C1 /* StatisticsDashboardTests.swift */; };
+		88BB7F54034D02001F8892A5 /* TextAnalysisPipelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75618ECF7546A3E901C6D1C6 /* TextAnalysisPipelineTests.swift */; };
+		A10A00000000000000000002 /* ConversationReply.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10A00000000000000000001 /* ConversationReply.swift */; };
+		A10A00000000000000000004 /* ConversationReplyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10A00000000000000000003 /* ConversationReplyTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -114,6 +117,14 @@
 		07E057E57DD6339F7BC73201 /* StatisticsDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatisticsDashboardView.swift; sourceTree = "<group>"; };
 		4888259F4A407112658E6A31 /* StatisticsPreviewData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatisticsPreviewData.swift; sourceTree = "<group>"; };
 		514841E0A773B87B4F2A12C1 /* StatisticsDashboardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatisticsDashboardTests.swift; sourceTree = "<group>"; };
+		75618ECF7546A3E901C6D1C6 /* TextAnalysisPipelineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextAnalysisPipelineTests.swift; sourceTree = "<group>"; };
+		A10A00000000000000000001 /* ConversationReply.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationReply.swift; sourceTree = "<group>"; };
+		A10A00000000000000000003 /* ConversationReplyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationReplyTests.swift; sourceTree = "<group>"; };
+		A10A00000000000000000005 /* BACKEND_SETUP.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = BACKEND_SETUP.md; sourceTree = "<group>"; };
+		A10A00000000000000000006 /* package.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = package.json; sourceTree = "<group>"; };
+		A10A00000000000000000007 /* wrangler.jsonc */ = {isa = PBXFileReference; lastKnownFileType = text; path = wrangler.jsonc; sourceTree = "<group>"; };
+		A10A00000000000000000008 /* worker.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = worker.js; sourceTree = "<group>"; };
+		A10A00000000000000000009 /* worker.test.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = worker.test.js; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -176,6 +187,7 @@
 		E329F95D46805A532206D6A3 /* Conversation */ = {
 			isa = PBXGroup;
 			children = (
+				A10A00000000000000000001 /* ConversationReply.swift */,
 				F9DB08A4B0A71D2E9E27DF39 /* ConversationHistoryStore.swift */,
 				8B2B9C6C66493FF90802FD6A /* ConversationAudioController.swift */,
 				4292123CDC2C6D4EABDA20B3 /* Views */,
@@ -203,6 +215,8 @@
 		3CF4D9833090438700EBB3F1 /* XiaoLiaoTests */ = {
 			isa = PBXGroup;
 			children = (
+				A10A00000000000000000003 /* ConversationReplyTests.swift */,
+				75618ECF7546A3E901C6D1C6 /* TextAnalysisPipelineTests.swift */,
 				514841E0A773B87B4F2A12C1 /* StatisticsDashboardTests.swift */,
 				8087E69B5F6753E5564AA30B /* StatisticsTests.swift */,
 				80003F66A17E898E3C708E71 /* ConversationPersistenceTests.swift */,
@@ -227,6 +241,7 @@
 		3CF4D96A3090438400EBB3F1 = {
 			isa = PBXGroup;
 			children = (
+				A10A00000000000000000010 /* Backend */,
 				A042A750E5204C8392B8DB01 /* README.md */,
 				A042A750E5204C8392B8DB02 /* AGENTS.md */,
 				A042A750E5204C8392B8DB03 /* PLAN.md */,
@@ -241,6 +256,7 @@
 		A042A750E5204C8392B8DB05 /* Docs */ = {
 			isa = PBXGroup;
 			children = (
+				A10A00000000000000000005 /* BACKEND_SETUP.md */,
 				A042A750E5204C8392B8DB04 /* FIGMA_ASSETS.md */,
 			);
 			path = Docs;
@@ -280,6 +296,30 @@
 				3A437B2B8BB7D09D770EA62C /* StatisticsCalculator.swift */,
 			);
 			path = Statistics;
+			sourceTree = "<group>";
+		};
+
+		A10A00000000000000000010 /* Backend */ = {
+			isa = PBXGroup;
+			children = (
+				A10A00000000000000000006 /* package.json */,
+				A10A00000000000000000007 /* wrangler.jsonc */,
+				A10A00000000000000000011 /* src */,
+				A10A00000000000000000012 /* test */,
+			);
+			path = Backend;
+			sourceTree = "<group>";
+		};
+		A10A00000000000000000011 /* src */ = {
+			isa = PBXGroup;
+			children = (A10A00000000000000000008 /* worker.js */,);
+			path = src;
+			sourceTree = "<group>";
+		};
+		A10A00000000000000000012 /* test */ = {
+			isa = PBXGroup;
+			children = (A10A00000000000000000009 /* worker.test.js */,);
+			path = test;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -418,6 +458,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A10A00000000000000000002 /* ConversationReply.swift in Sources */,
 				F09E82B45F09E05C58CB59C6 /* StatisticsPreviewData.swift in Sources */,
 				8A39236C84775454DC44FA9C /* StatisticsDashboardView.swift in Sources */,
 				FA3499AD461F8C5700473554 /* StatisticsDashboardModel.swift in Sources */,
@@ -454,6 +495,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A10A00000000000000000004 /* ConversationReplyTests.swift in Sources */,
+				88BB7F54034D02001F8892A5 /* TextAnalysisPipelineTests.swift in Sources */,
 				2FF005680C39655F51886202 /* StatisticsDashboardTests.swift in Sources */,
 				16DD6CA0F33E43D9C25CCEF9 /* StatisticsTests.swift in Sources */,
 				290512C389AAC9AC0F63F284 /* ConversationPersistenceTests.swift in Sources */,

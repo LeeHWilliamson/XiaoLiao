@@ -1,0 +1,13 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "xiaoliao-api",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-10-28",
+  "workers_dev": true,
+  "vars": { "OPENAI_MODEL": "gpt-6.1-terra" },
+  "durable_objects": {
+    "bindings": [{ "name": "CHAT_GATEWAY", "class_name": "ConversationGateway" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ConversationGateway"] }],
+  "observability": { "enabled": false }
+}

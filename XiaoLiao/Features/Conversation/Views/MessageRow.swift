@@ -36,6 +36,7 @@ struct MessageRow: View {
             Text(text)
                 .font(.system(size: systemMessageSize))
                 .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
                 .foregroundStyle(isResponse ? .white : XiaoLiaoTheme.systemRequestText)
                 .padding(14)
                 .frame(maxWidth: .infinity, minHeight: 147, alignment: .topLeading)
@@ -54,7 +55,7 @@ struct MessageRow: View {
                     }
                 }
                 .frame(maxWidth: 225)
-                .accessibilityLabel("\(isResponse ? "小聊系统示例回复" : "我发给小聊系统的消息")：\(text)")
+                .accessibilityLabel("\(isResponse ? "小聊系统回复" : "我发给小聊系统的消息")：\(text)")
                 .accessibilityIdentifier("message.\(message.logicalMessageID)")
             if isResponse { Spacer(minLength: 64) }
         }
@@ -107,8 +108,9 @@ struct MessageRow: View {
     }
 
     private func textRow(text: String) -> some View {
-        HStack(alignment: .top, spacing: 0) {
-            Spacer(minLength: 64)
+        let isPartner = message.senderRole == .aiPartner
+        return HStack(alignment: .top, spacing: 0) {
+            if !isPartner { Spacer(minLength: 64) }
             VStack(alignment: .center, spacing: 26) {
                 Button {
                     viewModel.selectMessage(message.id)
@@ -116,6 +118,7 @@ struct MessageRow: View {
                     Text(text)
                         .font(.system(size: messageSize))
                         .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
                         .foregroundStyle(message.modality == .spoken ? .white : .black)
                         .padding(14)
                         .frame(maxWidth: .infinity, minHeight: 147, alignment: .topLeading)
@@ -125,31 +128,33 @@ struct MessageRow: View {
                             RoundedRectangle(cornerRadius: 20)
                                 .strokeBorder(viewModel.editingMessageID == message.id && viewModel.audio.hasDraft ? Color.gray : .black, lineWidth: 2)
                         }
-                        .overlay(alignment: .bottomTrailing) {
+                        .overlay(alignment: isPartner ? .bottomLeading : .bottomTrailing) {
                             FigmaImage(artwork: .textTail)
                                 .frame(width: 17.2822, height: 23.3026)
                                 .rotationEffect(.degrees(150))
-                                .offset(x: 4, y: 8)
+                                .scaleEffect(x: isPartner ? -1 : 1, y: 1)
+                                .offset(x: isPartner ? -4 : 4, y: 8)
                         }
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("我的消息：\(text)")
+                .accessibilityLabel("\(isPartner ? "对话伙伴的消息" : "我的消息")：\(text)")
                 .accessibilityValue(isSelected ? "已选择" : "未选择")
                 .accessibilityHint("轻点显示或隐藏消息操作")
                 .accessibilityIdentifier("message.\(message.logicalMessageID)")
-                .overlay(alignment: .topLeading) {
+                .overlay(alignment: isPartner ? .topTrailing : .topLeading) {
                     if isSelected {
                         actionRail(isAudio: false)
-                            .offset(x: -49)
+                            .offset(x: isPartner ? 49 : -49)
                     }
                 }
 
                 detailCard
             }
             .frame(maxWidth: 225)
+            if isPartner { Spacer(minLength: 64) }
         }
-        .padding(.leading, 24)
-        .padding(.trailing, 65)
+        .padding(.leading, isPartner ? 53 : 24)
+        .padding(.trailing, isPartner ? 24 : 65)
     }
 
     private func actionRail(isAudio: Bool) -> some View {

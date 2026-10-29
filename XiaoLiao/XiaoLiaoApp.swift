@@ -29,6 +29,7 @@ struct XiaoLiaoApp: App {
             return .persistent(directory: directory)
         }
         #endif
-        return .persistent()
+        let service = ConversationReplyService.configured()
+        return .persistent(replyGenerator: { request in try await service.respond(to: request) })
     }
 }
