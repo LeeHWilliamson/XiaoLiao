@@ -28,19 +28,21 @@ final class XiaoLiaoTests: XCTestCase {
         XCTAssertEqual(english("我想练习英语。"), "我想练习英语。")
     }
 
-    func testSavedErrorsTranslateWhenRenderedWithoutRewritingTheirSource() {
+    func testSavedErrorsAreEnglishRegardlessOfInterfaceLanguage() {
         let savedError = "测试访问凭证无效。"
         let english = AppStrings(isEnglish: true)
         XCTAssertEqual(english.error(savedError), "The test access credential is invalid.")
-        XCTAssertEqual(AppStrings().error(savedError), savedError)
+        XCTAssertEqual(AppStrings().error(savedError), "The test access credential is invalid.")
         for error in [ConversationReplyError.notConfigured.localizedDescription,
                       ConversationReplyError.unavailable.localizedDescription,
                       SpeechTranscriptionError.modelUnavailable.localizedDescription,
                       "无法保存语法分析进度。消息已保留，请检查储存空间后重试分析。"] {
-            let translated = english.error(error)
-            XCTAssertNotEqual(translated, error)
-            XCTAssertNotEqual(translated, "Something went wrong. Please try again.")
-            XCTAssertNil(translated.range(of: "\\p{Han}", options: .regularExpression))
+            for strings in [AppStrings(), english] {
+                let translated = strings.error(error)
+                XCTAssertNotEqual(translated, error)
+                XCTAssertNotEqual(translated, "Something went wrong. Please try again.")
+                XCTAssertNil(translated.range(of: "\\p{Han}", options: .regularExpression))
+            }
         }
     }
 
@@ -50,6 +52,8 @@ final class XiaoLiaoTests: XCTestCase {
         XCTAssertEqual(english.error("等待服务 3秒"), "Something went wrong. Please try again.")
         XCTAssertEqual(english.error("Not found"), "Not found")
         XCTAssertEqual(english.error(""), "")
-        XCTAssertEqual(AppStrings().error("尚未收录的新服务错误。"), "尚未收录的新服务错误。")
+        XCTAssertEqual(AppStrings().error("尚未收录的新服务错误。"), "Something went wrong. Please try again.")
+        XCTAssertEqual(AppStrings().error("Not found"), "Not found")
+        XCTAssertEqual(AppStrings().error(""), "")
     }
 }

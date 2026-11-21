@@ -26,7 +26,7 @@ struct XiaoLiaoApp: App {
             let directory = URL.applicationSupportDirectory
                 .appendingPathComponent("XiaoLiaoUITests", isDirectory: true)
                 .appendingPathComponent(testID, isDirectory: true)
-            return .persistent(directory: directory)
+            return .persistent(directory: directory, learningPreferences: .configured())
         }
         if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
             // A unit-test host must not resume real history/recognition/provider jobs.
@@ -36,6 +36,7 @@ struct XiaoLiaoApp: App {
         let service = ConversationReplyService.configured()
         return .persistent(replyGenerator: { request in try await service.respond(to: request) },
                            grammarEvaluator: { request in try await service.evaluateGrammar(request) },
-                           audioTranscriber: { clip in try await LocalSpeechTranscriber.transcribe(clip) })
+                           audioTranscriber: { clip in try await LocalSpeechTranscriber.transcribe(clip) },
+                           learningPreferences: .configured())
     }
 }

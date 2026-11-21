@@ -20,7 +20,7 @@ enum MessageAction: String, Identifiable {
 extension Message {
     var actions: [MessageAction] {
         guard purpose == .conversationPractice, senderRole != .system else { return [] }
-        if senderRole == .aiPartner, case .audio = content { return [.transcribe, .translate, .repeatAudio] }
+        if senderRole == .aiPartner { return [.transcribe, .translate, .play] }
         return senderRole == .user ? [.translate, .play, .edit] : [.translate, .play]
     }
 }

@@ -1,4 +1,20 @@
-# Figma artwork provenance
+# Figma artwork: current usage and historical provenance
+
+## Current presentation — Concept 02
+
+Follow [AGENTS.md — Design source and constraints](../AGENTS.md#design-source-and-constraints) for the current frame map, palette, typography and interaction constraints. Concept 02 supersedes the original mockups and Concept 01. Asset names and original export dimensions below do not prescribe current control size, layout, tint or layer composition.
+
+The approved visual concept reuses the existing MenuGlyph/MenuOpenGlyph, SuggestGlyph, Play/Pause, Translate/Transcribe/Edit/Repeat, keyboard/system/microphone, Send and recording-wave PDF assets. Template tinting adapts their colors; fitted views retain their original proportions. Rounded card/control surfaces replace legacy decorative rings, ovals and tails. Legacy exports remain bundled for provenance; no full-screen mockup is used as an app asset.
+
+PaperTexture stays local with opacity 0.018. Central theme tokens and existing AccentColor/SystemRequest/SystemResponse/SystemRequestText/SettingsSelection color sets supply the new palette. TranscriptDot supplies static word-position marks; no fake timing or pronunciation judgment is shown. No temporary Figma URL or new asset dependency is introduced.
+
+Current key frames: New Conversation `78:78`, Voice Feed `78:103`, Recording `78:388`, Navigation Menu `78:644`, Conversation Settings `95:577`, Overall Statistics `95:1237` / empty `95:1436`. Menu surfaces are warm; selected history uses a green outline. The watermark is hidden. Partner cards retain an optional English transcript; learner speech is captioned by default. Actual audio availability and latest-message-only Edit still govern actions.
+
+Legacy palette assets and decorative exports remain in the catalog for provenance/source compatibility. Their presence does not authorize using navy history colors, old green/tan selections, heavy rings, speech tails, tall minimum-height bubbles or the watermark in current screens. Reuse the glyph artwork inside native Concept 02 surfaces. The Repeat glyph supports Restart/replay presentation where implemented; partner regeneration remains unavailable.
+
+## Historical export and implementation record
+
+**The remainder records older implementations. All placement, color, size, layering and interaction descriptions below are historical, not current instructions.** Keep source-node IDs and export dimensions for tracing the bundled artwork. For current usage, use the section above and AGENTS.md; do not reconstruct the former UI from these tables. Original conversion and validation records do not establish acceptance of the current SwiftUI rendering.
 
 Source file: [project_V2](https://www.figma.com/design/jVSZ8R37YkVCJOC32lLmMR/project_V2?node-id=1-3). Retrieved 2026-10-26 through Figma design context.
 
@@ -6,7 +22,7 @@ Original PNG fills are bundled unchanged. Original SVG layers were converted to 
 
 `FigmaArtwork.swift` records intrinsic sizes, and `FigmaImage` preserves aspect ratios. `ArtworkControls.swift` composes the separate ring/glyph exports. Microphone artwork originates in a 53-point control; other header glyphs originate in 64-point controls. Active transcript/translation states tint only the glyph white, above a green fill, as shown in the selected V2 frames.
 
-| Asset | Source node | Export dimensions | App placement |
+| Asset | Source node | Export dimensions | Original placement (historical) |
 | --- | --- | --- | --- |
 | PaperTexture | [`1:860`](https://www.figma.com/design/jVSZ8R37YkVCJOC32lLmMR/project_V2?node-id=1-860) | 1024 × 1024 | PaperBackground; 3% opacity, fill/crop |
 | ControlRing | [`1:868`](https://www.figma.com/design/jVSZ8R37YkVCJOC32lLmMR/project_V2?node-id=1-868) | 64 × 64 | ConversationHeader and composer controls |
@@ -42,11 +58,11 @@ UI is laid out within real device safe areas. The mockup's black device outline,
 
 Validation here checks asset existence, non-empty contents, image decoding, PDF page proportions, catalog references, and source callsites. The XCTest artwork check also loads every asset via UIImage on iOS. Effective rendering, tint, alignment, and tap regions still require the Xcode simulator comparison described in PLAN.md.
 
-## Milestone two — history and conversation settings
+### Historical milestone two — history and conversation settings
 
 Retrieved 2026-10-27 from history frame [`1:914`](https://www.figma.com/design/jVSZ8R37YkVCJOC32lLmMR/project_V2?node-id=1-914) and conversation-settings frame [`2:56`](https://www.figma.com/design/jVSZ8R37YkVCJOC32lLmMR/project_V2?node-id=2-56).
 
-| Asset | Source node | Export dimensions | App placement |
+| Asset | Source node | Export dimensions | Original placement (historical) |
 | --- | --- | --- | --- |
 | BackRing | `1:1167` | 64 × 64 | Settings Back and history Close |
 | BackGlyph | `1:1169` | 17.4473 × 32.0012 | Centered inside BackRing |
@@ -58,11 +74,11 @@ The existing paper texture and watermark are reused. History colors are `#182332
 
 History uses a native plain List for rows and separators, with the Figma pale trailing border. The settings capsules are custom branded controls: tan/green colors and 77-point height come from the Figma frame rather than the system segmented-control appearance. The user approved Apple system fonts in place of Inter and one “新对话” history row; other labels and visual patterns are retained. Runtime rendering still needs comparison in Xcode.
 
-## Milestone three — local audio practice
+### Historical milestone three — local audio practice
 
 Retrieved 2026-10-28 from recording frame [`2:121`](https://www.figma.com/design/jVSZ8R37YkVCJOC32lLmMR/project_V2?node-id=2-121). Original SVG layers were downloaded through the design-context asset URLs and converted to vector PDF using host librsvg/Cairo, preserving each root viewport. No conversion library is added to the app.
 
-| Asset | Source node | Export dimensions | App placement |
+| Asset | Source node | Export dimensions | Original placement (historical) |
 | --- | --- | --- | --- |
 | PauseGlyph | `1:1362` | 23.9229 × 31.9996 | Pause/resume control inside existing 64 × 64 ControlRing |
 | SendAudioGlyph | `2:164` | 32.0015 × 26.4738 | Send control inside existing 64 × 64 ControlRing |
@@ -71,17 +87,17 @@ Retrieved 2026-10-28 from recording frame [`2:121`](https://www.figma.com/design
 
 The row uses the design's 77-point green rounded surface and original paired waveform layers; elapsed seconds occupy the dotted status-text slot. The red RecordSurface and named SF Symbol remain underneath, dimmed while a recording draft is open. The user approved reusing this row for pause/review/resume and cancelling via keyboard/navigation. Playback reuses TranscriptLine/TranscriptDot in a seven-dot inline card from `2:303`; the active Play action uses the existing green/white artwork composition. The timeline reflects real clip progress. Newly recorded learner bubbles use the approved audio-only label instead of invented transcription. Existing fixture art and source URLs are unchanged, and no temporary Figma URLs occur at runtime. Effective rendering still requires Xcode comparison.
 
-## Inline system requests
+### Historical inline system requests
 
 References: [`24:89`](https://www.figma.com/design/jVSZ8R37YkVCJOC32lLmMR/project_V2?node-id=24-89), [`24:189`](https://www.figma.com/design/jVSZ8R37YkVCJOC32lLmMR/project_V2?node-id=24-189), and [`24:236`](https://www.figma.com/design/jVSZ8R37YkVCJOC32lLmMR/project_V2?node-id=24-236). New named colors are `SystemRequest` (`#C4F3FE`), `SystemResponse` (`#4C75E1`), and `SystemRequestText` (`#202020`). No new image exports are required.
 
 The composer reuses VoiceModeGlyph/ControlRing at 64 points in voice mode and 53 points in text mode. The armed composer uses the light-blue fill and retains Figma's “联系推荐人” placeholder; its microphone is dimmed/unavailable. User requests reuse TextTail at 17.2822 × 23.3026, rotated 150 degrees at the lower right. System replies have no tail and use a four-point white border. Both bubbles retain 20-point corners, 225-point maximum width, 147-point minimum height, and scaled 24-point system text. The paper texture and all normal-message artwork remain unchanged. Mock replies append a visible “本地示例” marker so canned content is identified; screenshot/device comparison remains pending.
 
-## Unified menu navigation — 2026-10-29
+### Historical unified menu navigation — 2026-10-29
 
 Source: [navigation frame 41:644](https://www.figma.com/design/jVSZ8R37YkVCJOC32lLmMR/project_V2?node-id=41-644), sidebar 41:710, and the updated New Conversation menu layers. Read through the Figma design-to-code/SwiftUI workflow. The panel is native layout/text with centralized design colors; the frame screenshot and underlying New Conversation content are not shipped as menu assets. The system gearshape replaces the design’s gear emoji by explicit user preference; ＋, ▤ and › remain the supplied typographic glyphs.
 
-| Asset | Source node | Export dimensions | App placement |
+| Asset | Source node | Export dimensions | Original placement (historical) |
 | --- | --- | --- | --- |
 | MenuRing | `34:414` | 64 × 64 | Single header menu control; new red outline, distinct from brown ControlRing |
 | MenuGlyph | `34:416` | 32.001 × 19.6759 | Closed-menu hamburger glyph, centered over MenuRing |
@@ -90,7 +106,7 @@ Source: [navigation frame 41:644](https://www.figma.com/design/jVSZ8R37YkVCJOC32
 
 All four original SVG exports were downloaded and converted to vector PDFs with the same librsvg/Cairo process, unchanged viewport dimensions and paths. Asset catalogs retain vector representations. Their original 59.16098-point ring layer plus its 4.09% export margins maps to the 64-point rendered ring; glyphs keep their original proportions and native size. No temporary Figma URL appears at runtime. Existing brown composer/message controls, PaperTexture, dashboard colors/charts and other artwork are unchanged. Source/project/asset checks do not replace Xcode rendering comparison.
 
-## User-directed recording controls — 2026-10-29
+### Historical recording controls — 2026-10-29
 
 This follow-up explicitly changes the recording-row interaction after the user reported working capture. Pause/Play now appears inside the existing green waveform surface, rendered white from the original PauseGlyph/PlayGlyph with preserved aspect ratio. The separate left control reuses RepeatGlyph at 32 points wide and proportional height over the 64-point ControlRing for Restart. The waveform retains RecordingWaveLead/RecordingWaveTrail, uses white template rendering at full opacity, and responds to real microphone level through height (static under Reduce Motion). No asset file, dependency, screen, statistics UI or navigation artwork changes. This supersedes the earlier pause/review/resume-capture interaction recorded above.
 

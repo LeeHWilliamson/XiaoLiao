@@ -7,6 +7,8 @@ nonisolated struct ConversationSession: Identifiable, Equatable, Codable, Sendab
     /// Append-only originals and edits, including superseded versions.
     var messages: [Message]
     var settings: ConversationSettings
+    var conversationAdjustments: String?
+    var explicitSettingKeys: [ConversationSettings.Key]
     var grammarObservations: [GrammarObservation] = []
     var vocabularyObservations: [VocabularyObservation] = []
     var textAnalyses: [MessageTextAnalysis] = []
@@ -17,12 +19,15 @@ nonisolated struct ConversationSession: Identifiable, Equatable, Codable, Sendab
     init(id: String, title: String, prompt: String, messages: [Message], settings: ConversationSettings,
          grammarObservations: [GrammarObservation] = [], vocabularyObservations: [VocabularyObservation] = [],
          textAnalyses: [MessageTextAnalysis] = [], pendingReply: PendingConversationReply? = nil,
-         grammarEvaluationJobs: [GrammarEvaluationJob] = [], pendingTranscription: SpeechTranscriptionJob? = nil) {
+         grammarEvaluationJobs: [GrammarEvaluationJob] = [], pendingTranscription: SpeechTranscriptionJob? = nil, conversationAdjustments: String? = nil,
+         explicitSettingKeys: [ConversationSettings.Key] = []) {
         self.id = id
         self.title = title
         self.prompt = prompt
         self.messages = messages
         self.settings = settings
+        self.conversationAdjustments = conversationAdjustments
+        self.explicitSettingKeys = explicitSettingKeys
         self.grammarObservations = grammarObservations
         self.vocabularyObservations = vocabularyObservations
         self.textAnalyses = textAnalyses
@@ -32,6 +37,7 @@ nonisolated struct ConversationSession: Identifiable, Equatable, Codable, Sendab
     }
 
     private enum CodingKeys: String, CodingKey {
+        case conversationAdjustments, explicitSettingKeys
         case id, title, prompt, messages, settings, grammarObservations, vocabularyObservations, textAnalyses, pendingReply, grammarEvaluationJobs, pendingTranscription
     }
 
@@ -42,6 +48,10 @@ nonisolated struct ConversationSession: Identifiable, Equatable, Codable, Sendab
         prompt = try values.decode(String.self, forKey: .prompt)
         messages = try values.decode([Message].self, forKey: .messages)
         settings = try values.decode(ConversationSettings.self, forKey: .settings)
+        conversationAdjustments = try values.decodeIfPresent(String.self, forKey: .conversationAdjustments)
+        // Existing sessions keep their established control behavior. New sessions start with defaults only.
+        explicitSettingKeys = try values.decodeIfPresent([ConversationSettings.Key].self, forKey: .explicitSettingKeys)
+            ?? ConversationSettings.Key.allCases
         grammarObservations = try values.decode([GrammarObservation].self, forKey: .grammarObservations)
         vocabularyObservations = try values.decode([VocabularyObservation].self, forKey: .vocabularyObservations)
         textAnalyses = try values.decodeIfPresent([MessageTextAnalysis].self, forKey: .textAnalyses) ?? []
@@ -70,7 +80,8 @@ nonisolated struct ConversationSession: Identifiable, Equatable, Codable, Sendab
     enum ValidationError: Error { case invalidMessage, invalidEditChain, invalidObservation }
 
     func validate() throws {
-        guard !id.isEmpty else { throw ValidationError.invalidMessage }
+        guard !id.isEmpty, (conversationAdjustments?.utf16.count ?? 0) <= 2000,
+              Set(explicitSettingKeys).count == explicitSettingKeys.count else { throw ValidationError.invalidMessage }
         var records: [String: Message] = [:]
         var latest: [String: Message] = [:]
         for message in messages {
@@ -125,7 +136,15 @@ nonisolated struct ConversationSession: Identifiable, Equatable, Codable, Sendab
         }
         if let request = pendingReply?.request {
             guard UUID(uuidString: request.requestID) != nil, request.conversationID == id,
-                  request.prompt == prompt, records[request.requestID] == nil else { throw ValidationError.invalidMessage }
+                  request.prompt == prompt, records[request.requestID] == nil,
+                  (request.overallPreferences?.utf16.count ?? 0) <= 2000,
+                  (request.conversationAdjustments?.utf16.count ?? 0) <= 2000,
+                  request.preferencesVersion == nil || request.preferencesVersion == 1,
+                  Set(request.explicitSettingKeys ?? []).count == (request.explicitSettingKeys ?? []).count else { throw ValidationError.invalidMessage }
+            if request.preferencesVersion == 1 {
+                guard request.overallPreferences != nil, request.conversationAdjustments != nil,
+                      request.explicitSettingKeys != nil else { throw ValidationError.invalidMessage }
+            }
             if let target = request.replyToMessageID {
                 guard let message = records[target], message.senderRole == .user,
                       latest[message.logicalMessageID]?.id == target, request.messages.last?.id == target,

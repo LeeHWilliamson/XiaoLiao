@@ -4,6 +4,208 @@ import XCTest
 
 final class ConversationReplyTests: XCTestCase {
     @MainActor
+    func testLearningPreferencesSaveClearValidationAndIsolatedPersistence() throws {
+        let suite = "XiaoLiao.PreferencesTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let preferences = LearningPreferencesStore(defaults: defaults)
+        XCTAssertEqual(preferences.text, "")
+        try preferences.save("  Travel and work conversations.  ")
+        XCTAssertEqual(preferences.text, "Travel and work conversations.")
+        XCTAssertEqual(LearningPreferencesStore(defaults: defaults).text, preferences.text)
+        XCTAssertThrowsError(try preferences.save(String(repeating: "😀", count: 1001)))
+        XCTAssertEqual(preferences.text, "Travel and work conversations.")
+        try preferences.save("  \n  ")
+        XCTAssertEqual(LearningPreferencesStore(defaults: defaults).text, "")
+        XCTAssertEqual(LearningPreferencesStore().text, "") // Plain models/previews do not read user defaults.
+    }
+
+    @MainActor
+    func testSavedPreferencesAffectNewRequestsButNeverRewritePendingRetries() async throws {
+        let preferences = LearningPreferencesStore()
+        try preferences.save("I enjoy travel.")
+        let probe = ReplyProbe(failAt: 1)
+        let model = ConversationViewModel(history: [], replyGenerator: { try await probe.respond($0) },
+                                          learningPreferences: preferences)
+        model.prompt = "Practice an interview"
+        XCTAssertTrue(model.startConversation())
+        await model.waitForPendingReplies()
+        let original = try XCTUnwrap(model.pendingReply?.request)
+        let firstID = try XCTUnwrap(model.activeSessionID)
+        XCTAssertEqual(original.overallPreferences, "I enjoy travel.")
+        try preferences.save("I enjoy science.")
+        model.retryReply()
+        await model.waitForPendingReplies()
+        var calls = await probe.calls
+        XCTAssertEqual(calls, [original, original])
+        model.draft = "Tell me about your work."
+        XCTAssertTrue(model.submitDraft())
+        await model.waitForPendingReplies()
+        calls = await probe.calls
+        XCTAssertEqual(calls.last?.overallPreferences, "I enjoy science.")
+        model.prepareNewConversation()
+        model.prompt = "Another scenario"
+        XCTAssertTrue(model.startConversation())
+        await model.waitForPendingReplies()
+        try preferences.save("I prefer follow-up questions.")
+        XCTAssertTrue(model.openConversation(firstID))
+        model.draft = "Let us continue."
+        XCTAssertTrue(model.submitDraft())
+        await model.waitForPendingReplies()
+        calls = await probe.calls
+        XCTAssertEqual(calls.last?.overallPreferences, "I prefer follow-up questions.")
+        XCTAssertEqual(calls.last?.conversationID, firstID)
+    }
+
+    @MainActor
+    func testBlueAdjustmentsPersistWithReplyAndCanBeClearedWithoutChangingGlobalPreferences() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let preferences = LearningPreferencesStore()
+        try preferences.save("Travel.")
+        let model = ConversationViewModel.persistent(directory: directory, replyGenerator: { request in
+            var response = ConversationReplyResponse(requestID: request.requestID, conversationID: request.conversationID,
+                replyToMessageID: request.replyToMessageID, kind: request.kind, text: "Accepted.",
+                settings: request.settings, model: "test", promptVersion: "test", explicitSettingKeys: request.explicitSettingKeys)
+            response.conversationAdjustments = request.kind == .system
+                ? (request.messages.last?.text == "Cancel" ? "" :
+                   request.messages.last?.text == "What does that mean?" ? request.conversationAdjustments ?? "" : "Ask one question at a time.")
+                : request.conversationAdjustments ?? ""
+            return response
+        }, learningPreferences: preferences)
+        model.prompt = "Practice travel"
+        XCTAssertTrue(model.startConversation())
+        await model.waitForPendingReplies()
+        model.toggleSystemMessageMode()
+        model.draft = "Ask one question at a time from now on."
+        XCTAssertTrue(model.submitDraft())
+        await model.waitForPendingReplies()
+        let id = try XCTUnwrap(model.activeSessionID)
+        XCTAssertEqual(model.history.first?.conversationAdjustments, "Ask one question at a time.")
+        XCTAssertEqual(preferences.text, "Travel.")
+        model.toggleSystemMessageMode()
+        model.draft = "What does that mean?"
+        XCTAssertTrue(model.submitDraft())
+        await model.waitForPendingReplies()
+        XCTAssertEqual(model.history.first?.conversationAdjustments, "Ask one question at a time.")
+        let reloaded = try ConversationHistoryStore(directory: directory).load()
+        XCTAssertEqual(reloaded.first?.conversationAdjustments, "Ask one question at a time.")
+        var nextSession = try XCTUnwrap(reloaded.first)
+        let nextMessage = Message(conversationID: id, senderRole: .user, modality: .written, content: .text("Let us continue."))
+        nextSession.messages.append(nextMessage)
+        let request = try ConversationReplyRequest(session: nextSession, replyingTo: nextMessage, overallPreferences: preferences.text)
+        XCTAssertEqual(request.conversationAdjustments, "Ask one question at a time.")
+        model.toggleSystemMessageMode()
+        model.draft = "Cancel"
+        XCTAssertTrue(model.submitDraft())
+        await model.waitForPendingReplies()
+        XCTAssertEqual(model.history.first { $0.id == id }?.conversationAdjustments, "")
+        XCTAssertEqual(preferences.text, "Travel.")
+    }
+
+    @MainActor
+    func testBlueCanMakeADefaultControlExplicitAndCancelItWithoutChangingItsValue() async throws {
+        let model = ConversationViewModel(history: [], replyGenerator: { request in
+            ConversationReplyResponse(requestID: request.requestID, conversationID: request.conversationID,
+                replyToMessageID: request.replyToMessageID, kind: request.kind, text: "Accepted.",
+                settings: request.settings, model: "test", promptVersion: "test",
+                conversationAdjustments: "", explicitSettingKeys: request.kind == .system
+                    ? (request.messages.last?.text == "Cancel" ? [] : [.replyLength]) : request.explicitSettingKeys)
+        })
+        model.prompt = "Practice"
+        XCTAssertTrue(model.startConversation())
+        await model.waitForPendingReplies()
+        model.toggleSystemMessageMode()
+        model.draft = "Use medium replies from now on."
+        XCTAssertTrue(model.submitDraft())
+        await model.waitForPendingReplies()
+        XCTAssertEqual(model.settings.replyLength, .medium)
+        XCTAssertEqual(model.history.first?.explicitSettingKeys, [.replyLength])
+        model.toggleSystemMessageMode()
+        model.draft = "Cancel"
+        XCTAssertTrue(model.submitDraft())
+        await model.waitForPendingReplies()
+        XCTAssertEqual(model.history.first?.explicitSettingKeys, [])
+        XCTAssertEqual(model.settings.replyLength, .medium)
+    }
+
+    @MainActor
+    func testBlueSummarySaveFailureKeepsOriginalStateAndPendingRequest() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let probe = ReplyProbe(failAt: 2)
+        let writer = ConversationViewModel.persistent(directory: directory, replyGenerator: { try await probe.respond($0) })
+        writer.prompt = "Practice"
+        XCTAssertTrue(writer.startConversation())
+        await writer.waitForPendingReplies()
+        writer.toggleSystemMessageMode()
+        writer.draft = "Ask one question at a time from now on."
+        XCTAssertTrue(writer.submitDraft())
+        await writer.waitForPendingReplies()
+        let id = try XCTUnwrap(writer.activeSessionID)
+        let pending = try XCTUnwrap(writer.pendingReply)
+        let reader = ConversationViewModel.persistent(
+            store: try ConversationHistoryStore(directory: directory, allowsSave: false), replyGenerator: { request in
+                ConversationReplyResponse(requestID: request.requestID, conversationID: request.conversationID,
+                    replyToMessageID: request.replyToMessageID, kind: request.kind, text: "Accepted.",
+                    settings: request.settings, model: "test", promptVersion: "test",
+                    conversationAdjustments: "Ask one question at a time.", explicitSettingKeys: request.explicitSettingKeys)
+            })
+        XCTAssertTrue(reader.openConversation(id))
+        reader.retryReply()
+        await reader.waitForPendingReplies()
+        XCTAssertNil(reader.history.first?.conversationAdjustments)
+        XCTAssertEqual(reader.pendingReply?.request, pending.request)
+        XCTAssertNotNil(reader.storageIssue)
+        XCTAssertFalse(reader.messages.contains { $0.id == pending.request.requestID })
+    }
+
+    func testLegacyPendingRequestAndCachedReplyRemainReadableButNewRequestsRequirePreferencesSupport() throws {
+        let session = ConversationSession(id: UUID().uuidString, title: "Test", prompt: "Practice", messages: [], settings: .init())
+        let request = try ConversationReplyRequest(session: session, overallPreferences: "Travel")
+        var requestJSON = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(request)) as? [String: Any])
+        for key in ["overallPreferences", "conversationAdjustments", "explicitSettingKeys", "preferencesVersion"] {
+            requestJSON.removeValue(forKey: key)
+        }
+        let legacyRequest = try JSONDecoder().decode(ConversationReplyRequest.self,
+            from: JSONSerialization.data(withJSONObject: requestJSON))
+        XCTAssertNil(legacyRequest.preferencesVersion)
+        let response = ConversationReplyResponse(requestID: request.requestID, conversationID: request.conversationID,
+            replyToMessageID: nil, kind: .partner, text: "Hello!", settings: request.settings,
+            model: "test", promptVersion: "old")
+        var responseJSON = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(response)) as? [String: Any])
+        responseJSON.removeValue(forKey: "conversationAdjustments")
+        responseJSON.removeValue(forKey: "preferencesVersion")
+        let legacyResponse = try JSONDecoder().decode(ConversationReplyResponse.self,
+            from: JSONSerialization.data(withJSONObject: responseJSON))
+        try legacyResponse.validate(for: legacyRequest)
+        XCTAssertThrowsError(try legacyResponse.validate(for: request))
+    }
+
+    @MainActor
+    func testManualSettingOverridesAndLegacyDecodingPreserveEstablishedBehavior() throws {
+        let model = ConversationViewModel(history: [])
+        model.prompt = "Practice"
+        model.settings.tone = .formal
+        XCTAssertTrue(model.startConversation())
+        var session = try XCTUnwrap(model.history.first)
+        XCTAssertEqual(session.explicitSettingKeys, [.tone])
+        model.updateSettings(.vocabulary) { $0.vocabulary = .medium } // Selecting an existing default is explicit.
+        session = try XCTUnwrap(model.history.first)
+        XCTAssertEqual(session.explicitSettingKeys, [.tone, .vocabulary])
+        model.settings.replyLength = .brief
+        session = try XCTUnwrap(model.history.first)
+        XCTAssertEqual(session.explicitSettingKeys, [.tone, .vocabulary, .replyLength])
+        var object = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(session)) as? [String: Any])
+        object.removeValue(forKey: "explicitSettingKeys")
+        object.removeValue(forKey: "conversationAdjustments")
+        let decoded = try JSONDecoder().decode(ConversationSession.self, from: JSONSerialization.data(withJSONObject: object))
+        XCTAssertNil(decoded.conversationAdjustments)
+        XCTAssertEqual(decoded.explicitSettingKeys, ConversationSettings.Key.allCases)
+        try decoded.validate()
+    }
+
+    @MainActor
     func testLiveConversationStartsEmptyAndStoresOnlyRealPartnerResults() async throws {
         let probe = ReplyProbe()
         let model = makeModel(probe)
@@ -24,6 +226,18 @@ final class ConversationReplyTests: XCTestCase {
         XCTAssertTrue(model.actions(for: partner).contains(.play))
         XCTAssertTrue(model.isAvailable(.play, for: partner))
         XCTAssertNil(model.audioClip(for: partner)) // Speech reads text; it is not a saved recording.
+        XCTAssertTrue(model.actions(for: partner).contains(.transcribe))
+        XCTAssertTrue(model.isAvailable(.transcribe, for: partner))
+        model.perform(.transcribe, on: partner.id)
+        XCTAssertNil(model.detailText(for: partner)) // Contextual actions require selection.
+        model.selectMessage(partner.id)
+        model.perform(.transcribe, on: partner.id)
+        if case let .text(text) = partner.content {
+            XCTAssertEqual(model.detailText(for: partner), text)
+        } else { XCTFail("Expected a text-backed partner reply") }
+        XCTAssertEqual(model.messages.first, partner) // Presentation does not rewrite modality/history.
+        model.perform(.transcribe, on: partner.id)
+        XCTAssertNil(model.detailText(for: partner))
         XCTAssertFalse(model.audio.isPlaying) // Receiving a reply never starts audio automatically.
         XCTAssertNil(partner.replyToMessageID)
         XCTAssertNil(model.pendingReply)
@@ -212,7 +426,7 @@ final class ConversationReplyTests: XCTestCase {
         let model = ConversationViewModel(history: [], replyGenerator: { request in
             ConversationReplyResponse(requestID: UUID().uuidString, conversationID: request.conversationID,
                 replyToMessageID: request.replyToMessageID, kind: request.kind, text: "Wrong reply",
-                settings: request.settings, model: "test", promptVersion: "test")
+                settings: request.settings, model: "test", promptVersion: "test", explicitSettingKeys: request.explicitSettingKeys)
         })
         model.suggestPrompt()
         XCTAssertTrue(model.startConversation())
@@ -309,9 +523,11 @@ final class ConversationReplyTests: XCTestCase {
                                 content: .audio(.init(storageKey: key, durationSeconds: 2))))
         let target = Message(conversationID: id, senderRole: .user, modality: .written, content: .text("My latest message."))
         messages.append(target)
-        let session = ConversationSession(id: id, title: "Test", prompt: "Practice", messages: messages, settings: .init())
+        let session = ConversationSession(id: id, title: "Test", prompt: "Practice", messages: messages, settings: .init(),
+                                          conversationAdjustments: "Ask one question at a time.")
         let request = try ConversationReplyRequest(session: session, replyingTo: target)
         XCTAssertEqual(request.messages.last?.id, target.id)
+        XCTAssertEqual(request.conversationAdjustments, "Ask one question at a time.")
         XCTAssertLessThanOrEqual(request.messages.count, 40)
         XCTAssertLessThanOrEqual(request.messages.reduce(0) { $0 + $1.text.utf16.count }, 24000)
         XCTAssertFalse(request.messages.contains { $0.id == messages[messages.count - 2].id })
@@ -348,10 +564,15 @@ private actor ReplyProbe {
         if number == failAt { throw ConversationReplyError.unavailable }
         var settings = request.settings
         if request.kind == .system { settings.vocabulary = .simple }
+        let keys = ConversationSettings.Key.allCases.filter {
+            (request.explicitSettingKeys ?? ConversationSettings.Key.allCases).contains($0) ||
+                (request.kind == .system && $0 == .vocabulary)
+        }
         return ConversationReplyResponse(requestID: request.requestID, conversationID: request.conversationID,
             replyToMessageID: request.replyToMessageID, kind: request.kind,
             text: request.kind == .system ? "好的，我会用更简单的词。" : "Welcome! What tea would you like?",
-            settings: settings, model: "test-model", promptVersion: "test-v1")
+            settings: settings, model: "test-model", promptVersion: "test-v1",
+            conversationAdjustments: request.conversationAdjustments ?? "", explicitSettingKeys: keys)
     }
 
     func release() {

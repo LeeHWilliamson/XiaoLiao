@@ -3,6 +3,45 @@ import XCTest
 @testable import XiaoLiao
 
 final class StatisticsTests: XCTestCase {
+    func testConversationScopeKeepsEditsAndExcludesOtherSessionsButUsesGlobalVocabularyFirstUse() throws {
+        let older = message("older", text: "run old", conversation: "old", time: 0)
+        let original = message("current", text: "run new", time: 86_400)
+        let edit = original.edited(content: .text("run newer"))
+        var current = try session(messages: [original, edit], analyzed: [original, edit])
+        current.grammarObservations = [GrammarObservation(metadata: metadata(original), opportunities: [
+            .init(id: "correct", category: GrammarObservation.TrackedCategory.verbTense.observationCategory,
+                  textSpan: .init(startUTF16: 0, lengthUTF16: 3), outcome: .correct,
+                  suggestedCorrection: nil, explanation: nil, confidence: nil)
+        ])]
+        let sessions = try [session(messages: [older], analyzed: [older]), current]
+        let snapshot = try StatisticsCalculator.snapshot(sessions: sessions, configuration: .init(mattrWindowSize: 2),
+            calendar: calendar, computedAt: date(999_999), conversationID: "one")
+        XCTAssertEqual(snapshot.overall.practiceAttempts, 2)
+        XCTAssertEqual(snapshot.overall.wordCount, 4)
+        XCTAssertEqual(snapshot.overall.sentenceCount, 2)
+        XCTAssertNil(snapshot.overall.clauseCount)
+        XCTAssertEqual(snapshot.overall.grammarEvaluatedAttempts, 1)
+        XCTAssertEqual(snapshot.overall.grammar.first { $0.category == .verbTense }?.accuracy, 1)
+        XCTAssertEqual(snapshot.overall.newlyObservedWordForms, 2) // new, newer; run belongs to old.
+        XCTAssertEqual(snapshot.conversations.map(\.conversationID), ["one"])
+        XCTAssertFalse(snapshot.days.contains { $0.start == calendar.startOfDay(for: older.createdAt) })
+        XCTAssertEqual(snapshot.days.reduce(0) { $0 + $1.statistics.practiceAttempts }, 2)
+        XCTAssertEqual(snapshot.vocabularyHistory.first { $0.wordForm == "run" }?.firstConversationID, "old")
+        XCTAssertEqual(try report(sessions).overall.practiceAttempts, 3) // Overall reporting remains unchanged.
+    }
+
+    func testEmptyConversationNeverFallsBackToOtherHistoryAndMissingConversationThrows() throws {
+        let other = message("other", text: "hello world", conversation: "other")
+        let empty = ConversationSession(id: "empty", title: "Empty", prompt: "Practice", messages: [], settings: .init())
+        let sessions = try [session(messages: [other], analyzed: [other]), empty]
+        let snapshot = try StatisticsCalculator.snapshot(sessions: sessions, conversationID: "empty")
+        XCTAssertEqual(snapshot.overall.practiceAttempts, 0)
+        XCTAssertNil(snapshot.overall.mattr)
+        XCTAssertNil(snapshot.overall.grammar.first?.accuracy)
+        XCTAssertTrue(snapshot.days.isEmpty)
+        XCTAssertThrowsError(try StatisticsCalculator.snapshot(sessions: sessions, conversationID: "missing"))
+    }
+
     func testMATTRUsesEverySlidingWindowAndRequiresEnoughWords() throws {
         XCTAssertEqual(try XCTUnwrap(StatisticsCalculator.mattr(words: ["a", "a", "b", "c"], windowSize: 3)), 5.0 / 6.0, accuracy: 0.000001)
         XCTAssertEqual(try StatisticsCalculator.mattr(words: ["a", "a", "a"], windowSize: 3), 1.0 / 3.0)

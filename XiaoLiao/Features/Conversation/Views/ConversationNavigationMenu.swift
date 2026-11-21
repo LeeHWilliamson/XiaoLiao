@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Figma 41:644 / 41:710: global navigation and local history in one drawer.
+/// Approved warm Concept 02 drawer; root-owned routing and local history are unchanged.
 struct ConversationNavigationMenu: View {
     @Environment(\.appStrings) private var strings
     let sessions: [ConversationSession]
@@ -12,9 +12,9 @@ struct ConversationNavigationMenu: View {
     let onDismiss: () -> Void
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @AccessibilityFocusState private var isTitleFocused: Bool
-    @ScaledMetric(relativeTo: .title) private var brandSize: CGFloat = 29
-    @ScaledMetric(relativeTo: .headline) private var actionSize: CGFloat = 19
-    @ScaledMetric(relativeTo: .body) private var rowSize: CGFloat = 18
+    @ScaledMetric(relativeTo: .title) private var brandSize: CGFloat = 24
+    @ScaledMetric(relativeTo: .headline) private var actionSize: CGFloat = 17
+    @ScaledMetric(relativeTo: .body) private var rowSize: CGFloat = 17
     @ScaledMetric(relativeTo: .caption) private var captionSize: CGFloat = 12
     private typealias Palette = XiaoLiaoTheme.NavigationMenu
 
@@ -22,7 +22,7 @@ struct ConversationNavigationMenu: View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
                 Button(action: onDismiss) {
-                    XiaoLiaoTheme.historyScrim.opacity(0.69)
+                    XiaoLiaoTheme.historyScrim.opacity(0.28)
                         .ignoresSafeArea()
                         .contentShape(Rectangle())
                 }
@@ -72,108 +72,80 @@ struct ConversationNavigationMenu: View {
         .background {
             Palette.background
                 .clipShape(UnevenRoundedRectangle(bottomTrailingRadius: 24, topTrailingRadius: 24))
+                .overlay { UnevenRoundedRectangle(bottomTrailingRadius: 24, topTrailingRadius: 24).strokeBorder(XiaoLiaoTheme.border, lineWidth: 1) }
                 .ignoresSafeArea(edges: .vertical)
         }
     }
 
     private var menuHeader: some View {
-        VStack(spacing: 20) {
-            HStack(alignment: .top, spacing: 12) {
+        VStack(spacing: 16) {
+            HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(strings("小聊"))
-                        .font(.system(size: brandSize, weight: .bold))
+                        .font(.system(size: brandSize, weight: .semibold))
                         .accessibilityAddTraits(.isHeader)
                         .accessibilityFocused($isTitleFocused)
                     Text(strings("你的英语学习伙伴"))
-                        .font(.subheadline)
-                        .foregroundStyle(Palette.secondary)
+                        .font(.caption).foregroundStyle(Palette.secondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-
                 Button(action: onSettings) {
-                    // User-approved monochrome replacement for Figma's gear emoji.
-                    Image(systemName: "gearshape")
-                        .font(.title2)
-                        .frame(width: 44, height: 44)
-                        .background(Palette.control, in: RoundedRectangle(cornerRadius: 14))
+                    Text(strings("设置")).font(.subheadline)
+                        .padding(.horizontal, 12).frame(minWidth: 44, minHeight: 44)
+                        .xiaoLiaoCard(cornerRadius: 16)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(strings("对话设置"))
                 .accessibilityIdentifier("menu.settings")
             }
-            .padding(.horizontal, 4)
-            .padding(.bottom, 12)
-
+            .padding(.bottom, 16)
             Button(action: onNewConversation) {
-                HStack(spacing: 16) {
-                    Text("＋").font(.title)
-                        .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 8) {
                     Text(strings("开始新对话"))
-                        .font(.system(size: actionSize, weight: .bold))
-                    Spacer(minLength: 0)
+                        .font(.system(size: actionSize, weight: .semibold))
+                    Text(strings("聊一个新的话题")).font(.caption)
                 }
-                .foregroundStyle(.white)
-                .padding(.horizontal, 22)
-                .padding(.vertical, 16)
-                .frame(maxWidth: .infinity, minHeight: 66)
-                .background(Palette.newConversation, in: RoundedRectangle(cornerRadius: 17))
-                .contentShape(RoundedRectangle(cornerRadius: 17))
+                .foregroundStyle(XiaoLiaoTheme.surface)
+                .padding(20)
+                .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
+                .background(Palette.newConversation, in: RoundedRectangle(cornerRadius: 20))
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("menu.new")
-
             Button(action: onStatistics) {
-                HStack(spacing: 14) {
-                    Text("▤").font(.title)
-                        .foregroundStyle(Palette.progressGlyph)
-                        .accessibilityHidden(true)
-                    VStack(alignment: .leading, spacing: 14) {
-                        Text(strings("学习进度"))
-                            .font(.system(size: actionSize, weight: .bold))
-                        Text(strings("看看你的英语进步"))
-                            .font(.footnote)
-                            .foregroundStyle(Palette.progressSubtitle)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    Text("›").font(.title)
-                        .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(strings("学习进度"))
+                        .font(.system(size: actionSize, weight: .semibold))
+                    Text(strings("看看你的英语进步"))
+                        .font(.caption).foregroundStyle(Palette.progressSubtitle)
                 }
-                .foregroundStyle(.white)
-                .padding(.horizontal, 18)
-                .padding(.vertical, 17)
-                .frame(maxWidth: .infinity, minHeight: 100)
-                .background(Palette.progress, in: RoundedRectangle(cornerRadius: 17))
-                .contentShape(RoundedRectangle(cornerRadius: 17))
+                .foregroundStyle(Palette.text)
+                .padding(20)
+                .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
+                .xiaoLiaoCard()
             }
             .buttonStyle(.plain)
             .accessibilityLabel(strings("学习进度，全部对话的学习统计"))
             .accessibilityIdentifier("menu.statistics")
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 32)
+        .padding(.horizontal, 24)
+        .padding(.top, 24)
     }
 
     private var historyHeading: some View {
-        VStack(spacing: 18) {
-            HStack {
-                Text(strings("以前的对话")).font(.headline)
-                    .accessibilityAddTraits(.isHeader)
-                Spacer(minLength: 8)
-                Text(strings("最近")).font(.system(size: captionSize))
-                    .foregroundStyle(Palette.secondary)
-            }
-            Rectangle().fill(Palette.divider).frame(height: 1)
-                .accessibilityHidden(true)
-        }
-        .padding(.horizontal, 24)
-        .padding(.top, 30)
-        .padding(.bottom, 13)
+        Text(strings("以前的对话"))
+            .font(.headline)
+            .accessibilityAddTraits(.isHeader)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 24)
+            .padding(.top, 32)
+            .padding(.bottom, 16)
     }
 
     private var historyRows: some View {
         ForEach(sessions) { session in
             historyRow(session)
-                .menuListRow(insets: EdgeInsets(top: 3.5, leading: 17, bottom: 3.5, trailing: 17))
+                .menuListRow(insets: EdgeInsets(top: 4, leading: 24, bottom: 4, trailing: 24))
         }
     }
 
@@ -181,19 +153,19 @@ struct ConversationNavigationMenu: View {
         let isSelected = session.id == selectedSessionID
         return HStack(spacing: 0) {
             Button { onSelect(session.id) } label: {
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 8) {
                     Text(session.title)
-                        .font(.system(size: rowSize, weight: isSelected ? .bold : .regular))
+                        .font(.system(size: rowSize, weight: .semibold))
                         .fixedSize(horizontal: false, vertical: true)
                     Text(historySubtitle(session))
                         .font(.system(size: captionSize))
                         .foregroundStyle(Palette.secondary)
                         .lineLimit(1)
                 }
-                .padding(.leading, 17)
+                .padding(.leading, 16)
                 .padding(.trailing, 8)
                 .padding(.vertical, 12)
-                .frame(maxWidth: .infinity, minHeight: 80, alignment: .leading)
+                .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -203,11 +175,9 @@ struct ConversationNavigationMenu: View {
 
             Button {} label: {
                 Text("▤")
-                    .font(.title2)
-                    .foregroundStyle(Palette.controlGlyph)
+                    .font(.body)
+                    .foregroundStyle(Palette.controlGlyph.opacity(0.35))
                     .frame(width: 38, height: 42)
-                    .background(isSelected ? Palette.selectedControl : Palette.control,
-                                in: RoundedRectangle(cornerRadius: 12))
                     .frame(minWidth: 44, minHeight: 44)
             }
             .buttonStyle(.plain)
@@ -217,13 +187,10 @@ struct ConversationNavigationMenu: View {
             .accessibilityIdentifier("menu.sessionStatistics.\(session.id)")
             .padding(.trailing, 7)
         }
-        .background(isSelected ? Palette.selected : .clear, in: RoundedRectangle(cornerRadius: 13))
-        .overlay(alignment: .leading) {
-            if isSelected {
-                RoundedRectangle(cornerRadius: 2).fill(Palette.selectedAccent)
-                    .frame(width: 4, height: 60)
-                    .accessibilityHidden(true)
-            }
+        .background(isSelected ? Palette.selected : .clear, in: RoundedRectangle(cornerRadius: 16))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16)
+                .strokeBorder(isSelected ? XiaoLiaoTheme.green : .clear, lineWidth: 1)
         }
     }
 

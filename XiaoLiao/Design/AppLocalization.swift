@@ -13,8 +13,8 @@ nonisolated enum AppLanguage {
     }()
 }
 
-/// Explicit bilingual UI copy. Translate at presentation time so persisted
-/// failures switch languages too, without rewriting messages or history.
+/// Explicit bilingual UI copy. Errors are always presented in English,
+/// including persisted failures, without rewriting messages or history.
 nonisolated struct AppStrings: Sendable {
     let isEnglish: Bool
 
@@ -52,8 +52,8 @@ nonisolated struct AppStrings: Sendable {
     }
 
     func error(_ source: String) -> String {
-        let translated = self(source)
-        if isEnglish, translated.range(of: "\\p{Han}", options: .regularExpression) != nil {
+        let translated = AppStrings(isEnglish: true)(source)
+        if translated.range(of: "\\p{Han}", options: .regularExpression) != nil {
             // Unknown future server errors still have understandable English UI.
             return "Something went wrong. Please try again."
         }
@@ -88,6 +88,29 @@ nonisolated struct AppStrings: Sendable {
     }.sorted { $0.specificity > $1.specificity }
 
     private static let english: [String: String] = [
+        "聊聊天，\n练英语。": "Chat a little.\nPractice English.",
+        "听一听，说一说，在对话中练习英语。": "Listen, speak, and practice English through conversation.",
+        "聊天话题": "Conversation topic",
+        "开始聊天": "Start chatting",
+        "帮我想个话题": "Suggest a topic",
+        "键盘": "Keyboard",
+        "系统": "System",
+        "开始录音": "Start recording",
+        "重录": "Restart",
+        "发送": "Send",
+        "向系统提问或调整对话…": "Ask the system or adjust the conversation…",
+        "输入英文消息…": "Type an English message…",
+        "对系统说": "To the system",
+        "对方": "Partner",
+        "我": "Me",
+        "英文": "English",
+        "中文": "Chinese",
+        "重播": "Replay",
+        "中文翻译": "Chinese translation",
+        "调整后立即生效": "Changes apply immediately",
+        "将界面按钮和说明显示为英语。错误信息始终使用英语。": "Show controls and instructions in English. Errors are always in English.",
+        "设置": "Settings",
+        "聊一个新的话题": "Start with a new topic",
         "AI 服务尚未配置，请联系测试管理员。": "AI service is not configured. Please contact the test administrator.",
         "AI 服务暂不可用，请稍后重试。": "AI service is unavailable. Please try again later.",
         "AI 服务暂未返回结果，请稍后重试。": "AI service timed out. Please try again later.",
@@ -138,6 +161,19 @@ nonisolated struct AppStrings: Sendable {
         "复杂": "Complex",
         "好": "OK",
         "学习统计": "Learning statistics",
+        "对话选项调整后立即生效；学习偏好需保存。": "Conversation options apply immediately; save learning preferences separately.",
+        "学习偏好": "Learning preferences",
+        "告诉我们你喜欢的话题、学习目标和希望的交流方式。": "Tell us your interests, learning goals and preferred conversation style.",
+        "例如：我喜欢旅行，想练习工作交流。请多问一些后续问题。": "For example: I enjoy travel and want to practice workplace conversations. Ask follow-up questions.",
+        "{0} / 2000 字符": "{0} / 2000 characters",
+        "仅在此设备保存，并随 AI 对话请求发送。保存后适用于所有对话的后续新回复；已排队的请求和重试保留原内容。": "Saved on this device and included in AI conversation requests. Changes apply to new replies in all conversations; queued requests and retries keep their original snapshot.",
+        "蓝色消息中的持续调整优先于对话主题，对话主题优先于这里的偏好。语气、用词和长度的明确设置仍适用于对应选项；未手动选择的选项仅作默认值。清空并保存即可移除偏好。": "Lasting blue-message adjustments override the conversation topic, which overrides these preferences. Explicit tone, vocabulary and length controls still govern those options; unselected options act as defaults. Clear and save to remove preferences.",
+        "学习偏好已保存": "Learning preferences saved",
+        "保存学习偏好": "Save learning preferences",
+        "本次对话统计": "Conversation statistics",
+        "本次对话": "This conversation",
+        "返回对话": "Return to conversation",
+        "暂时还没有本次对话的分析数据。发送练习消息后，已有结果会显示在这里。": "No analysis for this conversation yet. Available results will appear here after you send practice messages.",
         "学习进度": "Learning progress",
         "学习进度，全部对话的学习统计": "Learning progress, statistics for all conversations",
         "对话": "Conversation",
@@ -194,7 +230,9 @@ nonisolated struct AppStrings: Sendable {
         "无法开始录音。请检查麦克风是否可用，然后重试。": "Recording could not start. Check the microphone and try again.",
         "无法播放这段录音。请检查音频输出或重新录制。": "This recording could not be played. Check audio output or record again.",
         "无法朗读这条回复。请检查音频输出，然后轻点播放重试。文字回复仍已保留。": "This reply could not be read aloud. Check audio output and tap Play to retry. The text is preserved.",
+        "无法访问安全储存。请解锁设备后重试，访问码尚未更改。": "Secure storage is unavailable. Unlock your device and retry. The saved code has not changed.",
         "无法读取本地历史。已有数据未被清除。请稍后重试。": "Local history could not be read. Your data has not been cleared. Please retry later.",
+        "无法验证评分访问码，请检查网络后重试。": "The grading code could not be verified. Check your network and retry.",
         "日期": "Date",
         "时态一致性": "Tense consistency",
         "时长未知": "Unknown duration",
@@ -221,9 +259,12 @@ nonisolated struct AppStrings: Sendable {
         "正在请求麦克风权限或整理录音，请稍候": "Requesting microphone permission or processing audio. Please wait.",
         "正在转写英语…首次使用可能需要下载识别模型。": "Transcribing English… First use may require a speech-model download.",
         "正在转写英语录音": "Transcribing English audio",
+        "正在验证…": "Verifying…",
         "正式": "Formal",
         "此消息没有可播放的录音或可朗读的伙伴回复，或该操作暂不可用": "No playable recording or readable partner reply is available, or this action is unavailable",
         "此消息没有本地示例翻译": "No local sample translation is available for this message",
+        "此设备尚未保存评分访问码。": "No grading code is saved on this device.",
+        "此设备已保存评分访问码。": "A grading code is saved on this device.",
         "此设备暂不支持英语离线识别。请使用支持的 iPhone，或改用键盘输入。": "This device does not support offline English recognition. Use a supported device or type your message.",
         "每个窗口 {0} 个词。当天已分析词数不足时不显示分数；重复使用的词仍计入。": "Each window contains {0} words. Days with too few analyzed words have no score; repeated words still count.",
         "每日新观察到的词汇数量": "Daily newly observed vocabulary",
@@ -235,6 +276,7 @@ nonisolated struct AppStrings: Sendable {
         "点击横条，查看该项的每日准确率": "Tap a bar to view that category's daily accuracy",
         "用词难度": "Vocabulary difficulty",
         "看看你的英语进步": "See your English progress",
+        "移除访问码": "Remove code",
         "等待权限…": "Waiting for permission…",
         "简单": "Simple",
         "简短": "Brief",
@@ -255,6 +297,14 @@ nonisolated struct AppStrings: Sendable {
         "联系推荐人": "Message the system",
         "英语朗读声音暂不可用。请在系统设置的辅助功能朗读设置中检查英语声音，然后重试。": "An English speaking voice is unavailable. Check English voices in the system accessibility speech settings, then retry.",
         "英语识别模型暂未就绪。首次使用需联网下载，请检查网络和储存空间后重试。": "The English speech model is not ready. First use requires a download. Check your network and storage, then retry.",
+        "评分访问": "Grading access",
+        "评分访问尚未配置，请联系测试管理员。": "Grading access is not configured. Please contact the test administrator.",
+        "评分访问服务尚未部署，请联系测试管理员更新后端。": "Grading access is not deployed yet. Ask the test administrator to update the backend.",
+        "评分访问码": "Grading code",
+        "评分访问码已安全保存。返回对话后可重试未完成的请求。": "Grading code saved securely. Return to the conversation to retry any unfinished request.",
+        "评分访问码已移除。": "The grading code has been removed.",
+        "评分访问码无效或已撤销，请联系测试管理员。": "The grading code is invalid or has been revoked. Please contact the test administrator.",
+        "评分访问验证结果无效，请稍后重试。": "The grading access response is invalid. Please retry later.",
         "识别出的文字超过 4000 字符。录音已保留，请缩短后重新录制。": "The transcript exceeds 4,000 characters. The recording is preserved. Please record a shorter take.",
         "词数": "Words",
         "词数足够时显示多样性趋势": "Diversity trends appear when enough words are available",
@@ -271,6 +321,7 @@ nonisolated struct AppStrings: Sendable {
         "语音消息，{0}": "Voice message, {0}",
         "请先发送或取消当前录音": "Send or cancel the current recording first",
         "请先处理当前录音或等待中的回复": "Finish the current recording or pending reply first",
+        "请在设置中输入评分访问码，或联系测试管理员配置 AI 访问。": "Enter a grading code in Settings, or ask the test administrator to configure AI access.",
         "请提供聊天话题和对话发生的实际场景，或点击按钮生成提示。": "Describe a conversation topic and scenario, or tap the suggestion button.",
         "请求必须使用 JSON。": "The request must use JSON.",
         "请求无效。": "The request is invalid.",
@@ -278,6 +329,7 @@ nonisolated struct AppStrings: Sendable {
         "请求过长。": "The request is too large.",
         "请等待回复，或处理失败的请求后继续": "Wait for the reply or resolve the failed request to continue",
         "请输入消息，并等待当前回复完成后发送": "Enter a message and wait for the current reply before sending",
+        "请输入管理员提供的完整评分访问码（32–256 个非空格 ASCII 字符）。": "Enter the complete grading code provided by the administrator (32–256 non-space ASCII characters).",
         "转写": "Transcript",
         "转写尚未完成，录音已保留，可以重试。": "Transcription did not finish. The recording is preserved. You can retry.",
         "转写已中断，录音已保留。请重试。": "Transcription was interrupted. The recording is preserved. Please retry.",
@@ -286,6 +338,7 @@ nonisolated struct AppStrings: Sendable {
         "轻点显示或隐藏消息操作": "Tap to show or hide message actions",
         "轻点查看这一项的准确率趋势": "Tap to view this category's accuracy trend",
         "输入消息": "Enter a message",
+        "输入管理员提供的评分访问码，即可使用 AI 对话和语法分析。请勿输入 OpenAI 密钥。": "Enter the grading code provided by the administrator to use AI chat and grammar analysis. Do not enter an OpenAI key.",
         "返回语音输入": "Switch to voice input",
         "连续记录": "Continuous records",
         "部分录音文件暂不可用。对话文字和设置仍已保留。": "Some recording files are unavailable. Conversation text and settings are preserved.",
@@ -300,6 +353,7 @@ nonisolated struct AppStrings: Sendable {
         "需要麦克风权限才能录音。请在系统设置中允许小聊使用麦克风。": "Microphone permission is required. Allow XiaoLiao to use the microphone in Settings.",
         "音频": "Audio",
         "首次在你的练习中出现的词形 · 按日统计": "Word forms first seen in your practice · Daily totals",
+        "验证并保存": "Verify and save",
     ]
 }
 

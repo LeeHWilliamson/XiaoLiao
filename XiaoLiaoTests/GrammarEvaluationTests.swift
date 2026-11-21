@@ -4,6 +4,33 @@ import XCTest
 
 final class GrammarEvaluationTests: XCTestCase {
     @MainActor
+    func testConversationRetryAndQueueStatusDoNotIncludeAnotherConversationsFailures() async throws {
+        var first = eligibleSession()
+        var other = eligibleSession()
+        let firstRequest = try XCTUnwrap(GrammarEvaluationRequest(message: first.messages[0]))
+        let otherRequest = try XCTUnwrap(GrammarEvaluationRequest(message: other.messages[0]))
+        first.grammarEvaluationJobs = [.init(request: firstRequest, state: .failed, failureMessage: "First failure")]
+        other.grammarEvaluationJobs = [.init(request: otherRequest, state: .failed, failureMessage: "Other failure")]
+        let probe = GrammarProbe()
+        let model = ConversationViewModel(history: [first, other], grammarEvaluator: { try await probe.evaluate($0) })
+        XCTAssertEqual(model.failedGrammarCount, 2)
+        XCTAssertEqual(model.failedGrammarCount(conversationID: first.id), 1)
+        XCTAssertEqual(model.pendingGrammarCount(conversationID: first.id), 0)
+        XCTAssertEqual(model.grammarFailureMessage(conversationID: first.id), "First failure")
+        XCTAssertTrue(model.openConversation(other.id))
+        model.retryFailedGrammarEvaluations(conversationID: first.id)
+        await model.waitForPendingGrammarEvaluations()
+        let calls = await probe.calls
+        XCTAssertEqual(calls, [firstRequest])
+        XCTAssertEqual(model.failedGrammarCount(conversationID: first.id), 0)
+        XCTAssertEqual(model.failedGrammarCount(conversationID: other.id), 1)
+        let snapshot = try await model.statisticsSnapshot(conversationID: first.id)
+        XCTAssertEqual(snapshot.conversations.map(\.conversationID), [first.id])
+        XCTAssertEqual(snapshot.overall.grammarEvaluatedAttempts, 1)
+        XCTAssertEqual(model.activeSessionID, other.id)
+    }
+
+    @MainActor
     func testNewTextAndEveryEditReceiveSeparateSavedObservationsAndAccuracy() async throws {
         let probe = GrammarProbe()
         let model = makeModel(probe)
@@ -293,7 +320,7 @@ final class GrammarEvaluationTests: XCTestCase {
         defer { Task { await probe.release() } }
         let model = ConversationViewModel(history: [], replyGenerator: { request in
             .init(requestID: request.requestID, conversationID: request.conversationID, replyToMessageID: request.replyToMessageID,
-                  kind: request.kind, text: "Hello!", settings: request.settings, model: "test", promptVersion: "test")
+                  kind: request.kind, text: "Hello!", settings: request.settings, model: "test", promptVersion: "test", explicitSettingKeys: request.explicitSettingKeys)
         }, grammarEvaluator: { try await probe.evaluate($0) })
         model.suggestPrompt()
         XCTAssertTrue(model.startConversation())

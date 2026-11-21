@@ -5,13 +5,17 @@ struct ConversationFeedView: View {
     @Environment(\.appStrings) private var strings
     @Bindable var viewModel: ConversationViewModel
     let onMenu: () -> Void
+    let onStatistics: () -> Void
     @FocusState private var isComposerFocused: Bool
     @Environment(\.openURL) private var openURL
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(spacing: 0) {
-            ConversationHeader {
+            ConversationHeader(title: viewModel.history.first { $0.id == viewModel.activeSessionID }?.title ?? strings("小聊"), onStatistics: {
+                isComposerFocused = false
+                onStatistics()
+            }) {
                 isComposerFocused = false
                 onMenu()
             }
@@ -19,7 +23,7 @@ struct ConversationFeedView: View {
             GeometryReader { geometry in
                 ScrollViewReader { proxy in
                     ScrollView {
-                        VStack(spacing: 40) {
+                        LazyVStack(spacing: 24) {
                             ForEach(viewModel.messages, id: \.logicalMessageID) { message in
                                 MessageRow(viewModel: viewModel, message: message)
                                     .id(message.logicalMessageID)
@@ -84,16 +88,40 @@ struct ConversationFeedView: View {
     }
 
     private var composer: some View {
-        VStack(spacing: 12) {
-            if viewModel.audio.hasDraft { recordingRow }
-            Rectangle().fill(XiaoLiaoTheme.ink).frame(height: 1)
-            if viewModel.inputMode == .voice {
+        VStack(spacing: 16) {
+            Rectangle().fill(XiaoLiaoTheme.border).frame(height: 1)
+            if viewModel.audio.hasDraft {
+                recordingRow
+                HStack(spacing: 12) {
+                    Button {
+                        viewModel.showTextInput()
+                        isComposerFocused = true
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(FigmaArtwork.keyboardGlyph.rawValue)
+                                .renderingMode(.template).resizable().scaledToFit()
+                                .frame(width: 20, height: 16)
+                            Text(strings("键盘")).font(.subheadline)
+                        }
+                        .padding(.horizontal, 12).frame(minHeight: 44)
+                        .xiaoLiaoCard(cornerRadius: 16)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(strings("键盘输入"))
+                    .accessibilityIdentifier("conversation.keyboard")
+                    Text(strings("切换到键盘会丢弃未发送的录音"))
+                        .font(.caption).foregroundStyle(XiaoLiaoTheme.muted)
+                }
+            } else if viewModel.inputMode == .voice {
                 voiceComposer
             } else {
                 textComposer
             }
         }
-        .padding(.bottom, 8)
+        .padding(.horizontal, 28)
+        .padding(.bottom, 16)
+        .frame(maxWidth: 560)
+        .frame(maxWidth: .infinity)
         .background { PaperBackground() }
     }
 
@@ -101,15 +129,13 @@ struct ConversationFeedView: View {
         HStack {
             VStack(alignment: .leading, spacing: 8) {
                 if viewModel.isGeneratingReply {
-                    FigmaImage(artwork: .audioOval)
-                        .frame(width: 209, height: 86)
-                        .overlay { Text("…").font(.largeTitle.bold()).foregroundStyle(XiaoLiaoTheme.ink) }
-                        .overlay(alignment: .bottomLeading) {
-                            FigmaImage(artwork: .audioTail)
-                                .frame(width: 17.2822, height: 23.3026)
-                                .rotationEffect(.degrees(-154.56))
-                                .offset(x: 10, y: -2)
-                        }
+                    Text("…")
+                        .font(.largeTitle)
+                        .foregroundStyle(XiaoLiaoTheme.green)
+                        .padding(20)
+                        .frame(width: 240)
+                        .frame(minHeight: 72, alignment: .leading)
+                        .xiaoLiaoCard()
                         .accessibilityLabel(viewModel.pendingTranscription != nil ? strings("正在转写英语录音") : viewModel.pendingReply?.request.kind == .system ? strings("小聊系统正在回复") : strings("对话伙伴正在回复"))
                         .accessibilityIdentifier("conversation.replyLoading")
                     if viewModel.pendingTranscription != nil {
@@ -136,84 +162,77 @@ struct ConversationFeedView: View {
                     .frame(minHeight: 44)
                 }
             }
-            .frame(maxWidth: 225, alignment: .leading)
+            .frame(maxWidth: 300, alignment: .leading)
             Spacer(minLength: 40)
         }
-        .padding(.leading, 38)
+        .padding(.leading, 28)
         .padding(.trailing, 24)
         .accessibilityElement(children: .contain)
     }
 
     private var voiceComposer: some View {
-        VStack(spacing: 0) {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(spacing: 8) {
+                systemModeButton(size: 44)
+                Text(strings("系统")).font(.caption).foregroundStyle(XiaoLiaoTheme.muted)
+            }
+            .frame(width: 56)
             Button { viewModel.beginRecording() } label: {
-                FigmaImage(artwork: .recordSurface)
-                    .frame(width: 247, height: 81)
-                    .overlay(alignment: .top) {
-                        Image(systemName: "waveform.badge.microphone")
-                            .font(.system(size: 52))
-                            .foregroundStyle(.white)
-                            .padding(.top, 8)
-                    }
+                HStack(spacing: 12) {
+                    Image(systemName: "waveform.badge.microphone")
+                        .font(.system(size: 30))
+                        .accessibilityHidden(true)
+                    Text(strings("开始录音")).font(.headline)
+                }
+                .foregroundStyle(XiaoLiaoTheme.surface)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 12)
+                .frame(maxWidth: .infinity, minHeight: 64)
+                .background(XiaoLiaoTheme.red, in: RoundedRectangle(cornerRadius: 20))
             }
             .buttonStyle(.plain)
-            .disabled(viewModel.audio.hasDraft || !viewModel.canSubmitMessage)
-            .opacity(viewModel.audio.hasDraft || !viewModel.canSubmitMessage ? 0.5 : 1)
+            .disabled(!viewModel.canSubmitMessage)
+            .opacity(viewModel.canSubmitMessage ? 1 : 0.45)
             .accessibilityLabel(strings("录音"))
             .accessibilityHint(strings("轻点开始录音；录音时可暂停试听或发送"))
             .accessibilityIdentifier("conversation.record")
-
-            HStack {
-                systemModeButton(size: 64)
-                Spacer()
+            VStack(spacing: 8) {
                 ArtworkButton(label: strings("键盘输入"), glyph: .keyboardGlyph) {
                     viewModel.showTextInput()
                     isComposerFocused = true
                 }
-                .accessibilityHint(viewModel.audio.hasDraft ? strings("切换到键盘会丢弃未发送的录音") : "")
                 .accessibilityIdentifier("conversation.keyboard")
+                Text(strings("键盘")).font(.caption).foregroundStyle(XiaoLiaoTheme.muted)
             }
-            .padding(.horizontal, 20)
+            .frame(width: 56)
         }
-        .frame(maxWidth: 560)
-        .frame(maxWidth: .infinity)
     }
 
     private var recordingRow: some View {
         let audio = viewModel.audio
-        return HStack(spacing: 8) {
-            Button { viewModel.restartRecording() } label: {
-                FigmaImage(artwork: .controlRing)
-                    .frame(width: 64, height: 64)
-                    .overlay {
-                        FigmaImage(artwork: .repeatGlyph)
-                            .frame(width: 32, height: 32 * FigmaArtwork.repeatGlyph.size.height / FigmaArtwork.repeatGlyph.size.width)
-                    }
-            }
-            .buttonStyle(.plain)
-            .disabled(!audio.canSend)
-            .accessibilityLabel(strings("重新录音"))
-            .accessibilityHint(strings("丢弃当前未发送的录音，从头开始录制"))
-            .accessibilityIdentifier("conversation.restartRecording")
-
-            Button { Task { await audio.toggleDraftControl() } } label: {
-                HStack(spacing: 10) {
-                    if audio.canSend {
-                        Image((audio.recordingState == .recording || audio.isPreviewingDraft
-                               ? FigmaArtwork.pauseGlyph : .playGlyph).rawValue)
-                            .renderingMode(.template)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 24, height: 24)
-                    } else {
-                        ProgressView().tint(.white)
-                            .frame(width: 24, height: 24)
-                    }
-                    VStack(spacing: 6) {
-                        Text(recordingStatus(audio))
-                            .font(.caption.monospacedDigit().weight(.semibold))
-                            .multilineTextAlignment(.center)
-                            .fixedSize(horizontal: false, vertical: true)
+        return VStack(alignment: .leading, spacing: 12) {
+            Text(recordingStatus(audio))
+                .font(.subheadline.weight(.semibold).monospacedDigit())
+                .foregroundStyle(audio.recordingState == .recording ? XiaoLiaoTheme.red : XiaoLiaoTheme.green)
+            HStack(alignment: .center, spacing: 12) {
+                VStack(spacing: 8) {
+                    ArtworkButton(label: strings("重新录音"), glyph: .repeatGlyph,
+                                  isAvailable: audio.canSend) { viewModel.restartRecording() }
+                        .accessibilityHint(strings("丢弃当前未发送的录音，从头开始录制"))
+                        .accessibilityIdentifier("conversation.restartRecording")
+                    Text(strings("重录")).font(.caption).foregroundStyle(XiaoLiaoTheme.muted)
+                }
+                Button { Task { await audio.toggleDraftControl() } } label: {
+                    HStack(spacing: 12) {
+                        if audio.canSend {
+                            Image((audio.recordingState == .recording || audio.isPreviewingDraft
+                                   ? FigmaArtwork.pauseGlyph : .playGlyph).rawValue)
+                                .renderingMode(.template).resizable().scaledToFit()
+                                .frame(width: 22, height: 26)
+                                .frame(minWidth: 44, minHeight: 44)
+                        } else {
+                            ProgressView().tint(.white).frame(width: 44, height: 44)
+                        }
                         HStack(spacing: 0) {
                             recordingWave(.recordingWaveLead)
                             recordingWave(.recordingWaveTrail)
@@ -222,36 +241,28 @@ struct ConversationFeedView: View {
                         .frame(height: 31)
                         .scaleEffect(x: 1, y: reduceMotion || audio.recordingState != .recording ? 1 : 0.65 + 0.35 * audio.level)
                     }
-                    .frame(maxWidth: .infinity)
+                    .foregroundStyle(XiaoLiaoTheme.surface)
+                    .padding(12)
+                    .frame(maxWidth: .infinity, minHeight: 72)
+                    .background(XiaoLiaoTheme.green, in: RoundedRectangle(cornerRadius: 20))
                 }
-                .foregroundStyle(.white)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .frame(maxWidth: .infinity, minHeight: 77)
-                .background(XiaoLiaoTheme.green)
-                .clipShape(RoundedRectangle(cornerRadius: 20))
-                .overlay { RoundedRectangle(cornerRadius: 20).strokeBorder(.black, lineWidth: 2) }
+                .buttonStyle(.plain)
+                .disabled(!audio.canSend)
+                .accessibilityLabel(strings(audio.draftControlLabel))
+                .accessibilityValue(strings("\(Int(audio.duration))秒"))
+                .accessibilityHint(strings("录音时轻点结束采集，随后轻点播放或暂停试听；左侧按钮丢弃当前录音并重新录制"))
+                .accessibilityIdentifier("conversation.recordingControl")
+                VStack(spacing: 8) {
+                    ArtworkButton(label: strings("发送录音"), glyph: .sendAudioGlyph,
+                                  isAvailable: audio.canSend,
+                                  unavailableHint: strings("正在请求麦克风权限或整理录音，请稍候")) {
+                        Task { await viewModel.sendRecording() }
+                    }
+                    .accessibilityIdentifier("conversation.sendRecording")
+                    Text(strings("发送")).font(.caption).foregroundStyle(XiaoLiaoTheme.muted)
+                }
             }
-            .buttonStyle(.plain)
-            .disabled(!audio.canSend)
-            .accessibilityLabel(strings(audio.draftControlLabel))
-            .accessibilityValue(strings("\(Int(audio.duration))秒"))
-            .accessibilityHint(strings("录音时轻点结束采集，随后轻点播放或暂停试听；左侧按钮丢弃当前录音并重新录制"))
-            .accessibilityIdentifier("conversation.recordingControl")
-
-            ArtworkButton(
-                label: strings("发送录音"), glyph: .sendAudioGlyph, size: 64,
-                isAvailable: audio.canSend,
-                unavailableHint: strings("正在请求麦克风权限或整理录音，请稍候")
-            ) {
-                Task { await viewModel.sendRecording() }
-            }
-            .accessibilityIdentifier("conversation.sendRecording")
         }
-        .padding(.horizontal, 12)
-        .padding(.top, 8)
-        .frame(maxWidth: 560)
-        .frame(maxWidth: .infinity)
         .accessibilityElement(children: .contain)
     }
 
@@ -275,15 +286,15 @@ struct ConversationFeedView: View {
     }
 
     private var textComposer: some View {
-        HStack(spacing: 14) {
-            systemModeButton(size: 53)
+        HStack(spacing: 12) {
+            systemModeButton(size: 44)
 
             HStack(alignment: .bottom, spacing: 0) {
-                TextField(viewModel.isSystemMessageMode ? strings("联系推荐人") : "Textbox", text: $viewModel.draft, axis: .vertical)
-                    .font(.title2)
+                TextField(viewModel.isSystemMessageMode ? strings("向系统提问或调整对话…") : strings("输入英文消息…"), text: $viewModel.draft, axis: .vertical)
+                    .font(.body)
                     .lineLimit(1...4)
                     .padding(10)
-                    .frame(minHeight: 53)
+                    .frame(minHeight: 64)
                     .focused($isComposerFocused)
                     .disabled(!viewModel.canSubmitMessage)
                     .submitLabel(.send)
@@ -301,10 +312,10 @@ struct ConversationFeedView: View {
                     .padding(.trailing, 4)
                     .padding(.bottom, 4)
             }
-            .background(viewModel.isSystemMessageMode ? XiaoLiaoTheme.systemRequest : .white)
-            .overlay { Rectangle().strokeBorder(.black, lineWidth: 1) }
+            .background(viewModel.isSystemMessageMode ? XiaoLiaoTheme.systemRequest : XiaoLiaoTheme.surface, in: RoundedRectangle(cornerRadius: 20))
+            .overlay { RoundedRectangle(cornerRadius: 20).strokeBorder(viewModel.isSystemMessageMode ? XiaoLiaoTheme.systemResponse : XiaoLiaoTheme.border, lineWidth: 1) }
 
-            ArtworkButton(label: strings("返回语音输入"), glyph: .microphoneGlyph, size: 53,
+            ArtworkButton(label: strings("返回语音输入"), glyph: .microphoneGlyph, size: 44,
                           isAvailable: !viewModel.isSystemMessageMode,
                           unavailableHint: strings("系统消息仅支持文字，请先取消系统消息模式")) {
                 isComposerFocused = false
@@ -313,7 +324,6 @@ struct ConversationFeedView: View {
             .opacity(viewModel.isSystemMessageMode ? 0.4 : 1)
             .accessibilityIdentifier("conversation.microphone")
         }
-        .padding(.horizontal, 16)
         .frame(maxWidth: 560)
         .frame(maxWidth: .infinity)
     }

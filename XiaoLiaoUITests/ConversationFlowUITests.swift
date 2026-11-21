@@ -6,6 +6,40 @@ final class ConversationFlowUITests: XCTestCase {
     }
 
     @MainActor
+    func testGradingAccessCanBeSavedRelaunchedRemovedAndRejectedWithoutNetwork() {
+        let app = XCUIApplication.isolatedHistoryApp()
+        app.launchEnvironment["XIAOLIAO_UI_TEST_GRADING_ACCESS_FIXTURE"] = "1"
+        app.launch()
+        openMenuDestination("menu.settings", in: app)
+        scrollTo(app.switches["settings.gradingMode"], in: app)
+        app.switches["settings.gradingMode"].tap()
+        let field = app.secureTextFields["grading.accessCode"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        scrollTo(field, in: app)
+        field.tap()
+        field.typeText("fixture-grading-code-not-real-at-least-32-chars")
+        app.buttons["grading.saveCode"].tap()
+        let feedback = app.staticTexts["grading.accessFeedback"]
+        XCTAssertTrue(feedback.waitForExistence(timeout: 5))
+        XCTAssertTrue(feedback.label.contains("saved securely"))
+        app.terminate()
+        app.launch()
+        openMenuDestination("menu.settings", in: app)
+        let remove = app.buttons["grading.removeCode"]
+        XCTAssertTrue(remove.waitForExistence(timeout: 5))
+        scrollTo(remove, in: app)
+        remove.tap()
+        XCTAssertTrue(app.staticTexts["grading.accessStatus"].label.contains("No grading code"))
+        field.tap()
+        field.typeText("wrong-public-fixture-code-with-at-least-32-characters")
+        app.buttons["grading.saveCode"].tap()
+        let error = app.staticTexts["grading.accessError"]
+        XCTAssertTrue(error.waitForExistence(timeout: 5))
+        XCTAssertTrue(error.label.contains("invalid or has been revoked"))
+        XCTAssertFalse(remove.exists)
+    }
+
+    @MainActor
     func testGradingModeChangesInterfaceImmediatelyAndSurvivesRelaunch() {
         let app = XCUIApplication.isolatedHistoryApp()
         app.launch()
@@ -15,6 +49,7 @@ final class ConversationFlowUITests: XCTestCase {
         let grading = app.switches["settings.gradingMode"]
         XCTAssertTrue(grading.waitForExistence(timeout: 5))
         XCTAssertEqual(grading.value as? String, "0")
+        scrollTo(grading, in: app)
         grading.tap()
         XCTAssertTrue(app.staticTexts["Conversation settings"].waitForExistence(timeout: 5))
         XCTAssertEqual(app.buttons["settings.tone.casual"].value as? String, "Selected")
@@ -30,6 +65,7 @@ final class ConversationFlowUITests: XCTestCase {
         XCTAssertEqual(app.buttons["conversation.start"].label, "Chat")
         openMenuDestination("menu.settings", in: app)
         XCTAssertEqual(grading.value as? String, "1")
+        scrollTo(grading, in: app)
         grading.tap()
         XCTAssertTrue(app.staticTexts["对话设置"].waitForExistence(timeout: 5))
         XCTAssertEqual(app.buttons["settings.tone.casual"].value as? String, "已选择")
@@ -182,6 +218,10 @@ final class ConversationFlowUITests: XCTestCase {
     private func openMenu(in app: XCUIApplication) {
         let menu = app.buttons["navigation.menu"]
         XCTAssertTrue(menu.waitForExistence(timeout: 5))
+        for _ in 0..<8 {
+            if menu.isHittable { break }
+            app.swipeDown()
+        }
         menu.tap()
         XCTAssertTrue(app.buttons["menu.close"].waitForExistence(timeout: 5))
     }
@@ -214,6 +254,46 @@ final class ConversationFlowUITests: XCTestCase {
             if element.isHittable { return }
             app.swipeUp()
         }
+    }
+
+    @MainActor
+    func testLearningPreferencesExplicitSaveSurvivesRelaunch() {
+        let app = XCUIApplication.isolatedHistoryApp()
+        app.launch()
+        openMenuDestination("menu.settings", in: app)
+        let input = app.descendants(matching: .any)["settings.learningPreferences.input"].firstMatch
+        scrollTo(input, in: app)
+        input.tap()
+        input.typeText("I enjoy travel and follow-up questions.")
+        let save = app.buttons["settings.learningPreferences.save"]
+        scrollTo(save, in: app)
+        save.tap()
+        XCTAssertTrue(app.staticTexts["settings.learningPreferences.saved"].waitForExistence(timeout: 5))
+        app.terminate()
+        app.launch()
+        openMenuDestination("menu.settings", in: app)
+        let restored = app.descendants(matching: .any)["settings.learningPreferences.input"].firstMatch
+        scrollTo(restored, in: app)
+        XCTAssertEqual(restored.value as? String, "I enjoy travel and follow-up questions.")
+    }
+
+    @MainActor
+    func testConversationStatisticsButtonOpensScopedDashboardAndReturnsToSameFeed() {
+        let app = XCUIApplication.isolatedHistoryApp()
+        app.launch()
+        app.buttons["conversation.suggest"].tap()
+        app.buttons["conversation.start"].tap()
+        let learner = fixtureBubble("learner-text", in: app)
+        XCTAssertTrue(learner.waitForExistence(timeout: 5))
+        let messageID = learner.identifier
+        app.buttons["conversation.statistics"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["stats.conversation.screen"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["stats.empty"].waitForExistence(timeout: 5))
+        app.buttons["stats.returnToConversation"].tap()
+        XCTAssertTrue(app.buttons[messageID].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["conversation.record"].isEnabled)
+        openMenuDestination("menu.statistics", in: app)
+        XCTAssertTrue(app.staticTexts["全部对话 · 累计学习记录"].waitForExistence(timeout: 5))
     }
 
     @MainActor
@@ -310,7 +390,9 @@ final class ConversationFlowUITests: XCTestCase {
         openMenuDestination("menu.settings", in: app)
         let back = app.buttons["navigation.menu"]
         XCTAssertTrue(back.waitForExistence(timeout: 5))
+        scrollTo(app.buttons["settings.tone.warm"], in: app)
         app.buttons["settings.tone.warm"].tap()
+        scrollTo(app.buttons["settings.vocabulary.complex"], in: app)
         app.buttons["settings.vocabulary.complex"].tap()
         scrollTo(app.buttons["settings.replyLength.brief"], in: app)
         app.buttons["settings.replyLength.brief"].tap()
@@ -321,6 +403,7 @@ final class ConversationFlowUITests: XCTestCase {
         openMenuDestination("menu.settings", in: app)
         XCTAssertTrue(back.waitForExistence(timeout: 5))
         XCTAssertEqual(app.buttons["settings.tone.warm"].value as? String, "已选择")
+        scrollTo(app.buttons["settings.tone.formal"], in: app)
         app.buttons["settings.tone.formal"].tap()
         returnToConversation(in: app)
         openMenu(in: app)
@@ -372,6 +455,7 @@ final class ConversationFlowUITests: XCTestCase {
         openMenuDestination("menu.settings", in: app)
         let back = app.buttons["navigation.menu"]
         XCTAssertTrue(back.waitForExistence(timeout: 5))
+        scrollTo(app.buttons["settings.tone.formal"], in: app)
         app.buttons["settings.tone.formal"].tap()
         scrollTo(app.buttons["settings.replyLength.brief"], in: app)
         app.buttons["settings.replyLength.brief"].tap()

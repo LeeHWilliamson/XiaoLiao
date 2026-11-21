@@ -33,7 +33,9 @@ final class ConversationViewModel {
     @ObservationIgnored private let grammarEvaluator: GrammarEvaluator?
     @ObservationIgnored private var grammarEvaluationTask: Task<Void, Never>?
     private(set) var activeGrammarRequestIDs: Set<String> = []
+    private(set) var textStatisticsRevision = 0
     private(set) var grammarStatisticsRevision = 0
+    private(set) var grammarQueueIssueConversationID: String?
     private(set) var grammarQueueIssue: String?
     @ObservationIgnored private let audioTranscriber: AudioTranscriber?
     @ObservationIgnored private var transcriptionTask: Task<Void, Never>?
@@ -41,16 +43,33 @@ final class ConversationViewModel {
     private(set) var transcriptionQueueIsRunning = false
     private(set) var transcribingSessionID: String?
 
-    var pendingGrammarCount: Int { history.reduce(0) { $0 + $1.grammarEvaluationJobs.count } - failedGrammarCount }
-    var failedGrammarCount: Int {
-        history.flatMap(\.grammarEvaluationJobs).filter {
-            $0.state == .failed || ($0.state == .attempted && !activeGrammarRequestIDs.contains($0.id))
-        }.count
+    var pendingGrammarCount: Int { pendingGrammarCount(conversationID: nil) }
+    var failedGrammarCount: Int { failedGrammarCount(conversationID: nil) }
+    var grammarFailureMessage: String? { grammarFailureMessage(conversationID: nil) }
+
+    private func grammarJobs(conversationID: String?) -> [GrammarEvaluationJob] {
+        history.filter { conversationID == nil || $0.id == conversationID }.flatMap(\.grammarEvaluationJobs)
     }
-    var grammarFailureMessage: String? {
-        history.flatMap(\.grammarEvaluationJobs).first {
-            $0.state == .failed || ($0.state == .attempted && !activeGrammarRequestIDs.contains($0.id))
-        }.map { $0.failureMessage ?? "上次语法分析未完成，请重试。" }
+
+    private func grammarJobFailed(_ job: GrammarEvaluationJob) -> Bool {
+        job.state == .failed || (job.state == .attempted && !activeGrammarRequestIDs.contains(job.id))
+    }
+
+    func pendingGrammarCount(conversationID: String?) -> Int {
+        grammarJobs(conversationID: conversationID).filter { !grammarJobFailed($0) }.count
+    }
+
+    func failedGrammarCount(conversationID: String?) -> Int {
+        grammarJobs(conversationID: conversationID).filter { grammarJobFailed($0) }.count
+    }
+
+    func grammarFailureMessage(conversationID: String?) -> String? {
+        grammarJobs(conversationID: conversationID).first { grammarJobFailed($0) }
+            .map { $0.failureMessage ?? "上次语法分析未完成，请重试。" }
+    }
+
+    func grammarQueueIssue(conversationID: String?) -> String? {
+        conversationID == nil || conversationID == grammarQueueIssueConversationID ? grammarQueueIssue : nil
     }
 
     var usesLiveReplies: Bool { replyGenerator != nil }
@@ -70,10 +89,18 @@ final class ConversationViewModel {
     var inputMode: InputMode = .voice
     private(set) var isSystemMessageMode = false
     @ObservationIgnored private var inputModeBeforeSystem: InputMode = .voice
+    let learningPreferences: LearningPreferencesStore
+    private var explicitSettingKeys: [ConversationSettings.Key] = []
+    @ObservationIgnored private var selectedSettingKey: ConversationSettings.Key?
     var settings = ConversationSettings() {
         didSet {
             guard !isRestoringSettings else { return }
+            let previousKeys = explicitSettingKeys
+            explicitSettingKeys = ConversationSettings.Key.allCases.filter {
+                explicitSettingKeys.contains($0) || selectedSettingKey == $0 || settings.changedKeys(comparedTo: oldValue).contains($0)
+            }
             if !saveActiveConversation() {
+                explicitSettingKeys = previousKeys
                 isRestoringSettings = true
                 settings = oldValue
                 isRestoringSettings = false
@@ -94,7 +121,8 @@ final class ConversationViewModel {
 
     init(history: [ConversationSession]? = nil, audio: ConversationAudioController? = nil,
          textAnalyzer: TextAnalyzer? = nil, replyGenerator: ReplyGenerator? = nil, grammarEvaluator: GrammarEvaluator? = nil,
-         audioTranscriber: AudioTranscriber? = nil) {
+         audioTranscriber: AudioTranscriber? = nil, learningPreferences: LearningPreferencesStore? = nil) {
+        self.learningPreferences = learningPreferences ?? LearningPreferencesStore()
         self.history = history ?? MockConversation.history
         self.audio = audio ?? ConversationAudioController()
         self.replyGenerator = replyGenerator
@@ -111,9 +139,10 @@ final class ConversationViewModel {
     /// The app opts into disk storage explicitly; tests and previews stay isolated.
     static func persistent(directory: URL? = nil, audio: ConversationAudioController? = nil,
                            textAnalyzer: TextAnalyzer? = nil, replyGenerator: ReplyGenerator? = nil,
-                           grammarEvaluator: GrammarEvaluator? = nil, audioTranscriber: AudioTranscriber? = nil) -> ConversationViewModel {
+                           grammarEvaluator: GrammarEvaluator? = nil, audioTranscriber: AudioTranscriber? = nil,
+                           learningPreferences: LearningPreferencesStore? = nil) -> ConversationViewModel {
         let model = ConversationViewModel(history: [], audio: audio, textAnalyzer: textAnalyzer,
-                                          replyGenerator: replyGenerator, grammarEvaluator: grammarEvaluator, audioTranscriber: audioTranscriber)
+                                          replyGenerator: replyGenerator, grammarEvaluator: grammarEvaluator, audioTranscriber: audioTranscriber, learningPreferences: learningPreferences)
         model.storageDirectory = directory ?? ConversationHistoryStore.defaultDirectory
         model.retryLoadingHistory()
         return model
@@ -121,9 +150,10 @@ final class ConversationViewModel {
 
     static func persistent(store: ConversationHistoryStore, audio: ConversationAudioController? = nil,
                            textAnalyzer: TextAnalyzer? = nil, replyGenerator: ReplyGenerator? = nil,
-                           grammarEvaluator: GrammarEvaluator? = nil, audioTranscriber: AudioTranscriber? = nil) -> ConversationViewModel {
+                           grammarEvaluator: GrammarEvaluator? = nil, audioTranscriber: AudioTranscriber? = nil,
+                           learningPreferences: LearningPreferencesStore? = nil) -> ConversationViewModel {
         let model = ConversationViewModel(history: [], audio: audio, textAnalyzer: textAnalyzer,
-                                          replyGenerator: replyGenerator, grammarEvaluator: grammarEvaluator, audioTranscriber: audioTranscriber)
+                                          replyGenerator: replyGenerator, grammarEvaluator: grammarEvaluator, audioTranscriber: audioTranscriber, learningPreferences: learningPreferences)
         model.storageDirectory = store.directory
         model.historyStore = store
         model.retryLoadingHistory()
@@ -153,6 +183,15 @@ final class ConversationViewModel {
 
     var canStart: Bool { !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
+    /// A deliberate tap on an already-selected default also overrides prose preferences.
+    func updateSettings(_ key: ConversationSettings.Key, change: (inout ConversationSettings) -> Void) {
+        selectedSettingKey = key
+        defer { selectedSettingKey = nil }
+        var updated = settings
+        change(&updated)
+        settings = updated
+    }
+
     func suggestPrompt() {
         prompt = MockConversation.prompt
     }
@@ -166,15 +205,16 @@ final class ConversationViewModel {
             title: prompt == MockConversation.prompt ? "乌龟" : String(prompt.trimmingCharacters(in: .whitespacesAndNewlines).prefix(12)),
             prompt: prompt,
             messages: usesLiveReplies ? [] : MockConversation.messages(conversationID: sessionID, createdAt: Date()),
-            settings: settings
+            settings: settings, explicitSettingKeys: explicitSettingKeys
         )
         if usesLiveReplies {
-            do { session.pendingReply = .init(request: try ConversationReplyRequest(session: session), failureMessage: nil) }
+            do { session.pendingReply = .init(request: try ConversationReplyRequest(session: session, overallPreferences: learningPreferences.text), failureMessage: nil) }
             catch { replyIssue = error.localizedDescription; return false }
         }
         guard let saved = persist(session) else { return false }
         activeSessionID = nil
         messageVersions = saved.messages
+        explicitSettingKeys = saved.explicitSettingKeys
         grammarObservations = saved.grammarObservations
         vocabularyObservations = saved.vocabularyObservations
         textAnalyses = saved.textAnalyses
@@ -196,7 +236,10 @@ final class ConversationViewModel {
         grammarObservations = session.grammarObservations
         vocabularyObservations = session.vocabularyObservations
         textAnalyses = session.textAnalyses
+        isRestoringSettings = true
         settings = session.settings
+        isRestoringSettings = false
+        explicitSettingKeys = session.explicitSettingKeys
         resetPresentation()
         activeSessionID = session.id
         return true
@@ -210,6 +253,7 @@ final class ConversationViewModel {
         vocabularyObservations = []
         textAnalyses = []
         settings = ConversationSettings()
+        explicitSettingKeys = []
         resetPresentation()
     }
 
@@ -231,7 +275,7 @@ final class ConversationViewModel {
         guard messages.contains(where: { $0.id == message.id }), message.actions.contains(action) else { return false }
         guard !audio.hasDraft else { return false }
         switch action {
-        case .transcribe: return message.transcription != nil
+        case .transcribe: return message.transcription != nil || partnerSpeechText(for: message) != nil
         case .edit: return !isSystemMessageMode && canEditMessage(message.id)
         case .translate: return translation(for: message) != nil
         case .play:
@@ -268,7 +312,7 @@ final class ConversationViewModel {
                 details[id] = .playback
                 audio.togglePlayback(clip, id: id)
             } else if let text = partnerSpeechText(for: message) {
-                details[id] = nil
+                if details[id] != .transcript { details[id] = nil }
                 audio.toggleSpeech(text, id: id)
             }
         case .repeatAudio:
@@ -286,7 +330,7 @@ final class ConversationViewModel {
     func detailText(for message: Message) -> String? {
         switch details[message.id] {
         case .transcript:
-            return message.transcription?.text
+            return message.transcription?.text ?? partnerSpeechText(for: message)
         case .translation:
             return translation(for: message)
         case .playback, nil:
@@ -497,6 +541,7 @@ final class ConversationViewModel {
         var session = history[index]
         session.messages = updated
         session.settings = updatedSettings ?? settings
+        session.explicitSettingKeys = explicitSettingKeys
         return commitSession(session)
     }
 
@@ -507,6 +552,7 @@ final class ConversationViewModel {
         // Network completions belong to their own conversation, even after navigation.
         guard activeSessionID == saved.id else { return true }
         messageVersions = saved.messages
+        explicitSettingKeys = saved.explicitSettingKeys
         grammarObservations = saved.grammarObservations
         vocabularyObservations = saved.vocabularyObservations
         textAnalyses = saved.textAnalyses
@@ -551,7 +597,7 @@ final class ConversationViewModel {
     /// Retry missing local analyses before capturing a fresh report. Failed
     /// analysis leaves coverage incomplete; it never turns into a fabricated zero.
     func statisticsSnapshot(configuration: StatisticsConfiguration = .init(), interval: DateInterval? = nil,
-                            calendar: Calendar = .current) async throws -> StatisticsSnapshot {
+                            calendar: Calendar = .current, conversationID: String? = nil) async throws -> StatisticsSnapshot {
         guard storageDirectory == nil || isStorageReady else { throw CocoaError(.fileReadUnknown) }
         retryPendingTextAnalyses()
         await waitForPendingTextAnalyses()
@@ -560,7 +606,7 @@ final class ConversationViewModel {
         let sessions = history
         return try await Task.detached(priority: .utility) {
             try StatisticsCalculator.snapshot(sessions: sessions, configuration: configuration,
-                                              interval: interval, calendar: calendar)
+                                              interval: interval, calendar: calendar, conversationID: conversationID)
         }.value
     }
 
@@ -641,6 +687,7 @@ final class ConversationViewModel {
             }
             history[index] = saved
             if activeSessionID == saved.id { textAnalyses = saved.textAnalyses }
+            textStatisticsRevision += 1
         } catch {
             // Preserve both the submitted message and any existing storage alert.
             // An analysis write failure must not look like a failed chat send.
@@ -783,7 +830,7 @@ extension ConversationViewModel {
         session.messages[messageIndex] = message
         session.pendingTranscription = nil
         if job.requestsPartnerReply, replyGenerator != nil {
-            session.pendingReply = .init(request: try ConversationReplyRequest(session: session, replyingTo: message), failureMessage: nil)
+            session.pendingReply = .init(request: try ConversationReplyRequest(session: session, replyingTo: message, overallPreferences: learningPreferences.text), failureMessage: nil)
         }
         if grammarEvaluator != nil, let request = GrammarEvaluationRequest(message: message) {
             session.grammarEvaluationJobs.append(.init(request: request))
@@ -815,7 +862,7 @@ extension ConversationViewModel {
         session.settings = settings
         do {
             if usesLiveReplies {
-                session.pendingReply = .init(request: try ConversationReplyRequest(session: session, replyingTo: message), failureMessage: nil)
+                session.pendingReply = .init(request: try ConversationReplyRequest(session: session, replyingTo: message, overallPreferences: learningPreferences.text), failureMessage: nil)
             }
         } catch {
             replyIssue = error.localizedDescription
@@ -879,10 +926,22 @@ extension ConversationViewModel {
         session.messages.append(message)
         session.pendingReply = nil
         if request.kind == .system {
-            // Preserve controls changed by the person while the request was in flight.
-            if session.settings.tone == request.settings.tone { session.settings.tone = response.settings.tone }
-            if session.settings.vocabulary == request.settings.vocabulary { session.settings.vocabulary = response.settings.vocabulary }
-            if session.settings.replyLength == request.settings.replyLength { session.settings.replyLength = response.settings.replyLength }
+            // Lasting blue-message changes are saved with the reply, never into global preferences.
+            session.conversationAdjustments = response.conversationAdjustments ?? session.conversationAdjustments
+            // Preserve controls changed or newly made explicit while the request was in flight.
+            let requestKeys = request.explicitSettingKeys ?? ConversationSettings.Key.allCases
+            let currentKeys = session.explicitSettingKeys
+            let manuallyChanged = session.settings.changedKeys(comparedTo: request.settings)
+            func unchangedSelection(_ key: ConversationSettings.Key) -> Bool {
+                currentKeys.contains(key) == requestKeys.contains(key) && !manuallyChanged.contains(key)
+            }
+            if unchangedSelection(.tone) && session.settings.tone == request.settings.tone { session.settings.tone = response.settings.tone }
+            if unchangedSelection(.vocabulary) && session.settings.vocabulary == request.settings.vocabulary { session.settings.vocabulary = response.settings.vocabulary }
+            if unchangedSelection(.replyLength) && session.settings.replyLength == request.settings.replyLength { session.settings.replyLength = response.settings.replyLength }
+            let returnedKeys = response.explicitSettingKeys ?? requestKeys
+            session.explicitSettingKeys = ConversationSettings.Key.allCases.filter {
+                unchangedSelection($0) ? returnedKeys.contains($0) : currentKeys.contains($0)
+            }
         }
         // On save failure, keep the immutable pending request for explicit retry.
         _ = commitSession(session)
@@ -910,6 +969,7 @@ extension ConversationViewModel {
               storageDirectory == nil || isStorageReady,
               history.contains(where: { $0.grammarEvaluationJobs.contains { $0.state == .queued } }) else { return }
         grammarQueueIssue = nil
+        grammarQueueIssueConversationID = nil
         grammarEvaluationTask = Task { [weak self] in
             guard let self else { return }
             await self.drainGrammarEvaluations()
@@ -918,10 +978,13 @@ extension ConversationViewModel {
     }
 
     /// Explicit user retry only; attempted/interrupted jobs are not retried on launch.
-    func retryFailedGrammarEvaluations() {
+    func retryFailedGrammarEvaluations(conversationID: String? = nil) {
         guard grammarEvaluator != nil else { return }
-        grammarQueueIssue = nil
-        for index in history.indices {
+        if conversationID == nil || conversationID == grammarQueueIssueConversationID {
+            grammarQueueIssue = nil
+            grammarQueueIssueConversationID = nil
+        }
+        for index in history.indices where conversationID == nil || history[index].id == conversationID {
             var session = history[index]
             var changed = false
             for jobIndex in session.grammarEvaluationJobs.indices {
@@ -1005,6 +1068,7 @@ extension ConversationViewModel {
             if activeSessionID == saved.id { grammarObservations = saved.grammarObservations }
             return true
         } catch {
+            grammarQueueIssueConversationID = session.id
             grammarQueueIssue = "无法保存语法分析进度。消息已保留，请检查储存空间后重试分析。"
             return false
         }

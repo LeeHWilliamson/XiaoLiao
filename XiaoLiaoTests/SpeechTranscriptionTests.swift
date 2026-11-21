@@ -373,7 +373,7 @@ private actor SpeechProbe {
     func reply(_ request: ConversationReplyRequest) -> ConversationReplyResponse {
         replyRequests.append(request)
         return .init(requestID: request.requestID, conversationID: request.conversationID, replyToMessageID: request.replyToMessageID,
-            kind: request.kind, text: "What tea do you like?", settings: request.settings, model: "test", promptVersion: "test")
+            kind: request.kind, text: "What tea do you like?", settings: request.settings, model: "test", promptVersion: "test", explicitSettingKeys: request.explicitSettingKeys)
     }
 
     func grammar(_ request: GrammarEvaluationRequest) -> GrammarEvaluationResponse {

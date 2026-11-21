@@ -128,7 +128,7 @@ test("chat and grammar share limits but use separate request-cache namespaces", 
   t.mock.method(globalThis, "fetch", async (_url, options) => {
     const body = JSON.parse(options.body);
     return providerResponse(body.text.format.name === "xiaoliao_grammar_v1" ? output() : {
-      text: "Hello!", settings: { tone: "casual", vocabulary: "medium", replyLength: "medium" }
+      explicitSettingKeys: [], conversationAdjustments: "", text: "Hello!", settings: { tone: "casual", vocabulary: "medium", replyLength: "medium" }
     });
   });
   const { send, storage } = runtime();

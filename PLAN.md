@@ -1,16 +1,26 @@
 # XiaoLiao implementation plan
 
-Current implementation: local conversations/history/audio, immutable message versions, overall statistics, local word/sentence analysis, and user-confirmed live AI text conversations and grammar statistics. On-device English recognition for newly sent recordings/replacements is now implemented and awaits Mac/physical-iPhone validation. On-demand Apple partner text-to-speech is also implemented and awaits device testing. Grammar judgment quality, pronunciation scoring, clause evaluation, cloud-generated voices, and current-conversation statistics remain future work or pending review. The updated single-button Figma navigation and unified menu/history drawer are now implemented; statistics content is preserved. Mac acceptance remains pending where noted.
+## Current state and next validation
 
-The sections below record each milestone's scope and validation at the time. Later follow-ups supersede earlier deferrals; see AGENTS.md for current conventions and README.md for current usage.
+**Visual source of truth: Concept 02**, as specified in [AGENTS.md](AGENTS.md#design-source-and-constraints). SwiftUI source now uses the warm drawer, rounded cards/controls, deep green/terracotta palette and no watermark or speech tails. Overall statistics retain their chart/table structure and calculations. Partner voice cards offer on-demand Apple speech and a transcript toggle; learner speech keeps default captions. Rhythm dots remain static, with synchronized highlighting deferred. English errors apply in both interface modes; grading access and the saved interface-language preference remain intact.
 
-## Initial inspection — 2026-10-26
+Next: build and run the native regressions on the Mac, then compare the existing screens with the Concept 02 frames on iPhone/iPad. No successful compilation or native visual acceptance is inferred from source checks. General Settings, pronunciation scoring, clause/vocabulary judgment and timed rhythm highlighting remain future work. The current-conversation statistics increment below adds a feed button and scoped dashboard; its source is complete and native validation remains pending. Retain the Concept 02 visual validation checklist as well.
+
+Explicit learning-preference source work is now complete: an editor in existing settings, local explicit Save, snapshots on new requests, and durable per-conversation blue adjustments. Deploy the updated Worker before live testing; no new secrets. See the latest increment below.
+
+Current functional implementation: local conversations/history/audio, immutable message versions, overall statistics, local word/sentence analysis, and user-confirmed live AI text conversations and grammar statistics. On-device English recognition for newly sent recordings/replacements is now implemented and awaits Mac/physical-iPhone validation. On-demand Apple partner text-to-speech is also implemented and awaits device testing. Grammar judgment quality, pronunciation scoring, clause evaluation, cloud-generated voices remain future work or pending review. Current-conversation statistics now reuse the existing dashboard with an explicit session scope. The updated single-button Figma navigation and unified menu/history drawer are now implemented; statistics content is preserved. Mac acceptance remains pending where noted.
+
+## Historical implementation log
+
+Everything below records scope, decisions and validation **at the time of each increment**, rather than a fresh task list or current visual specification. Early stop instructions, ‘next authorized’ statements, unchecked acceptance steps and milestone-only restrictions are historical context. Later follow-ups supersede earlier behavior/deferrals. In particular, references to the navy drawer, red rings, speech ovals/tails, watermark, three-button header and old bubble geometry describe retired presentation; **do not reimplement those visuals**. Concept 02 and the active guidance in AGENTS.md govern new work. README.md describes current usage. Historical test counts/results do not imply that later changes have passed native tests.
+
+### Initial inspection — 2026-10-26
 
 The repository began as an unchanged Xcode SwiftUI starter: `XiaoLiaoApp` launches a `ContentView` containing a globe and “Hello, world!”. It has an empty AccentColor, an empty AppIcon, and template XCTest/UI-test targets. There were no existing feature models, design tokens, package dependencies, backend code, or project instruction files. The starter used filesystem-synchronized target folders, Swift language mode 5, main-actor default isolation for the app, and iOS 26.5 deployment settings. A navigator workaround now uses explicit file references; retain the original build settings.
 
 Figma is accessible. The supplied link targets the `mockup` canvas; individual frames provide the usable design context. See `AGENTS.md` for frame links and conventions.
 
-## Milestone 1 — local conversation UI
+### Milestone 1 — local conversation UI
 
 Scope: New Conversation, a basic Conversation Feed, navigation, Figma mock messages, and selection-driven contextual actions. Stop here after implementation and handoff.
 
@@ -28,7 +38,7 @@ Scope: New Conversation, a basic Conversation Feed, navigation, Figma mock messa
 
 Acceptance: the target should remain buildable; users can enter or seed a topic, open the mock feed, select either message, reveal the appropriate action rail, and return to the topic screen. Any source-only checks must be reported separately from a successful build.
 
-### Implementation and verification status
+#### Implementation and verification status
 
 Milestone-one source work is complete. The user reported that the demo looks great; agent-side Xcode build/test acceptance remains unverified. The next authorized work is milestone two below.
 
@@ -40,7 +50,7 @@ Milestone-one source work is complete. The user reported that the demo looks gre
 - `xcodebuild -version` failed with `command not found` on this Linux host; no Swift toolchain is present either. No compilation, XCTest execution, simulator run, or comparison of the rendered app to Figma has occurred. Those remain required before declaring this milestone verified.
 - Settings, stats/history drawer, speaker switching, recording, playback, and regeneration remain unavailable. Translation/transcription are fixture toggles; text edits/submissions only change in-memory data. Nothing survives relaunch.
 
-### Xcode validation checklist
+#### Xcode validation checklist
 
 - Build with an iOS SDK supporting the retained 26.5 deployment target; run unit and UI tests.
 - At 440-point reference width, compare colors, paper texture, artwork proportions, bubble placement, and action rails with `1:859`, `1:887`, `7:36`, `1:980`, and `7:99`.
@@ -52,7 +62,7 @@ Milestone-one source work is complete. The user reported that the demo looks gre
 - Check smaller iPhones, landscape, iPad layout, large accessibility text, Reduce Motion, and VoiceOver labels/order. Real scroll indicators appear only when there is scrollable content.
 - Confirm no microphone permission prompt or network requests occur. Settings, stats, recording, playback, and regeneration are intentionally unavailable.
 
-### Product decisions confirmed 2026-10-27
+#### Product decisions confirmed 2026-10-27
 
 1. An initial prompt is required. Users must supply one or click prompt generation; the current suggestion button supplies a deterministic mock prompt. The original optional wording was a design-copy mistake, and the placeholder now reflects the required input.
 2. Leave the coffee/turtle mock mistranslation unchanged for now, as requested.
@@ -60,7 +70,7 @@ Milestone-one source work is complete. The user reported that the demo looks gre
 4. Use Apple system fonts rather than Inter in the new history/settings views, as approved, with scaled text sizes.
 5. Preserve the voice/text bubble palette. The user clarified that appearance follows the communication method used to send each message, rather than the current composer mode. Retain the reply-length labels from Figma, including “复杂”; no copy rewrite is part of this milestone.
 
-## Milestone 2 — conversation history and conversation settings
+### Milestone 2 — conversation history and conversation settings
 
 Authorized scope: the history drawer (`1:914`) and conversation settings (`2:56`), using local state and the existing visual design. General settings and conversation adjustment remain future work. Stop after these two flows are ready for testing.
 
@@ -79,7 +89,7 @@ History is intentionally in memory for this milestone and resets on app relaunch
 
 Both gear controls open Conversation Settings directly in this milestone. No general-settings intermediary or conversation-adjustment screen is implemented. Settings do not change the canned AI reply: no backend service is connected.
 
-### Milestone-two validation status
+#### Milestone-two validation status
 
 - Static project checks passed: 15 app Swift files, three unit-test source files, and three UI-test source files are each registered once in the correct target. The asset catalog remains registered once in app Resources. Existing build configurations, target identifiers, signing, deployment target, and concurrency settings are unchanged.
 - Static asset checks passed for all 30 image assets and 12 color assets: catalog JSON, non-empty PNG/PDF files, PNG integrity, PDF page proportions, Swift callsites, and named-color references. The new SVG artwork was downloaded from Figma and converted to vector PDF; the drawer/settings back art was verified identical before reuse. No runtime network client, temporary Figma URL, or third-party package reference was added.
@@ -89,7 +99,7 @@ Both gear controls open Conversation Settings directly in this milestone. No gen
 
 Milestone-two source implementation is ready for testing. The user reported that the flows look good and subsequently authorized milestone three. General settings, statistics, persisted history, and backend integration remain future work.
 
-### Milestone-two Xcode checks
+#### Milestone-two Xcode checks
 
 - Confirm Features, Design, the two new views, and the new history unit-test file appear in the navigator. Build with the retained iOS 26.5 deployment settings and run all tests.
 - From New Conversation, check required prompt copy and generation; open/close history without losing the typed prompt. Open conversation settings, change all three controls, return, and start a conversation.
@@ -100,7 +110,7 @@ Milestone-two source implementation is ready for testing. The user reported that
 - Verify history scrolling, small iPhones, landscape, iPad, large accessibility text, VoiceOver focus/selected values, and Reduce Motion. Verify settings Back returns to the correct originating screen.
 - Relaunch and confirm the documented mock reset; persistence belongs to a future milestone. Recording, stats, and live AI generation must remain unavailable.
 
-### Follow-up fixes — message appearance and editing
+#### Follow-up fixes — message appearance and editing
 
 The user reported two issues: changing composer mode recolored earlier messages, and older learner messages could still be edited.
 
@@ -114,11 +124,11 @@ Xcode checks: switch to keyboard input and back before sending anything; the exi
 
 Validation: source review and `git diff --check` completed; the Xcode project file is unchanged because the changes and regression tests use existing registered files. The build attempt failed with `xcodebuild: command not found` (exit 127). The new tests and simulator checks have not run here.
 
-## Milestone 3 — local audio practice
+### Milestone 3 — local audio practice
 
 Authorized 2026-10-28. Implement real local recording/review/playback with Apple audio APIs, preserving the existing Figma feed. Stop after the flow is ready for Xcode/device testing. No live AI or speech recognition is included.
 
-### Confirmed design and scope
+#### Confirmed design and scope
 
 - Inspected high-fidelity context and screenshots for recording (`2:121`), playback (`2:303`), voice editing (`2:432`), loading (`2:505`), and sent voice (`2:537`).
 - The user approved reusing the designed Pause/waveform/Send row for review: Pause finalizes the current audio, tapping the waveform previews/pauses it, tapping Pause again resumes, and switching to the keyboard or leaving the feed discards the unsent recording. No new screen or review sheet is added.
@@ -126,7 +136,7 @@ Authorized 2026-10-28. Implement real local recording/review/playback with Apple
 - Only the latest learner message offers Edit. Real recorded messages record a replacement through the designed row; cancellation/failure preserves the original. Existing text and fixture-transcript edits keep using the text composer.
 - The partner-loading bubble in `2:505` is reserved for actual service integration. Local processing is shown in the recording row only while permission/file finalization is genuinely pending. No artificial response-loading delay is introduced.
 
-### Implementation
+#### Implementation
 
 - [x] Add an observable main-actor audio controller using `AVAudioRecorder`, `AVAudioPlayer`, `AVAudioApplication` microphone permission, and `AVAudioSession` lifecycle handling.
 - [x] Record mono PCM into app-owned temporary CAF files. Pausing closes the current segment; resuming starts another. Join segments in order using fixed-size buffers off the main actor so preview/send reads a finalized file without loading the entire clip into memory.
@@ -139,7 +149,7 @@ Authorized 2026-10-28. Implement real local recording/review/playback with Apple
 - [x] Add nine focused audio tests covering denied/cancelled permission, interruption while permission is pending, segment order/sample preservation, invalid audio, history retention and message colors, stale-session rejection, atomic replacement/cancellation, and latest-message editing. Extend the existing UI smoke flow to check that recording is enabled and recording-row actions are initially absent. No real microphone or playback is invoked by these automated tests.
 - [ ] Build, run tests, and compare rendering in Xcode; verify the real recording/playback lifecycle on an iPhone.
 
-### Validation status
+#### Validation status
 
 The build command was attempted here and failed with `xcodebuild: command not found` (exit 127). No successful compilation, XCTest run, simulator rendering, or device audio test is claimed. The existing Mac UI-test runner initialization timeout remains unresolved; it is separate from a failed app assertion. Source/project/asset checks and the manual device checklist below are the handoff, not a replacement for runtime validation.
 
@@ -147,7 +157,7 @@ Static checks passed: the Xcode project parses, all 16 app/four unit-test/three 
 
 Apple API references: [recording](https://developer.apple.com/documentation/avfaudio/avaudiorecorder), [microphone permission](https://developer.apple.com/documentation/avfaudio/avaudioapplication), [audio files and PCM buffers](https://developer.apple.com/documentation/avfaudio/avaudiofile), [interruptions](https://developer.apple.com/documentation/avfaudio/handling-audio-interruptions).
 
-### Xcode and device checklist
+#### Xcode and device checklist
 
 1. Build with the retained iOS 26.5 deployment target. Confirm the new controller/test file and four image assets appear in Xcode. Verify the built app's Info contains the microphone usage description in both build configurations. Run `XiaoLiaoTests`, including `ConversationAudioTests`; retry the UI suite when its runner can initialize.
 2. Launch a conversation: there must be no microphone prompt until Record is tapped. Deny permission, confirm the explanation and Settings link, then grant permission and retry. Keep a working keyboard path when permission/input hardware is unavailable.
@@ -161,7 +171,7 @@ Apple API references: [recording](https://developer.apple.com/documentation/avfa
 
 Milestone-three source work stopped at its boundary. The user subsequently authorized milestone four A while microphone testing remains pending until later. Open runtime questions: actual microphone/input routing on the user's cloud Mac, physical-device interruption behavior, and visual/accessibility comparison in Xcode. Speech recognition and live partner audio remain future integration work.
 
-## Milestone 4 A — local persisted history
+### Milestone 4 A — local persisted history
 
 Authorized 2026-10-28: “Just the first part of Milestone 4.” Scope is local history persistence using the existing drawer; statistics and cloud/backend services remain out of scope. No new history screen, deletion/menu/search flow, or generated title is added.
 
@@ -178,7 +188,7 @@ Authorized 2026-10-28: “Just the first part of Milestone 4.” Scope is local 
 
 Data is stored locally in the app's Application Support directory, using `History.store` and separate `Recordings/*.caf` files. This is persistence on the same installation, not a cross-device account or a remote backup feature. Earlier milestones never wrote history to disk, so their already-lost in-memory sessions cannot be migrated. Newly started conversations still use mock partner messages; persistence does not imply live AI.
 
-### Milestone-four A validation
+#### Milestone-four A validation
 
 The simulator build command was attempted and failed with `xcodebuild: command not found` (exit 127). No successful compilation, SwiftData execution, unit/UI-test pass, simulator comparison, or microphone test is claimed. The earlier `Timed out waiting for AX loaded notification` UI-runner problem remains unresolved.
 
@@ -197,7 +207,7 @@ Apple references: [SwiftData persistence](https://developer.apple.com/documentat
 
 Stop after local history persistence. No outstanding design choice blocks this implementation; runtime acceptance and the milestone-three microphone checks remain pending.
 
-## Follow-up — inline system requests
+### Follow-up — inline system requests
 
 Authorized after the user reviewed new Figma frames and confirmed the bottom-left head/arrow control toggles/cancels the mode. Requests are text only; system replies are always text. This replaces the earlier adjustment textbox/modal (`2:89`). The user explicitly waived compatibility work; no migration/reset UI or data deletion was added.
 
@@ -216,7 +226,7 @@ Static checks passed for the three color assets' JSON/exact hex values, shared a
 
 Manual check: open a conversation, tap the bottom-left control, verify the blue composer/disabled microphone, type “你能用更简单的词吗？” and send using the keyboard. Confirm a light-blue request and dark-blue local-demo reply, normal composer restoration, and Simple vocabulary in conversation settings. Repeat with “当前对话设置是什么？” and arbitrary text. Reopen through history and relaunch to confirm both message types retain their appearance. Check small iPhones, keyboard avoidance, Dynamic Type, VoiceOver labels, and that previous practice messages keep their original colors. Do not treat the local demonstration as live AI understanding or changed generated partner speech.
 
-## Follow-up — standalone data model definitions
+### Follow-up — standalone data model definitions
 
 Historical scope; superseded by the app-integration follow-up below.
 
@@ -234,7 +244,7 @@ The existing ConversationMessage remains the running app's model. The proposed g
 
 Validation: project parsing/source-registration checks and `git diff --check` passed. All 21 app, five unit-test, and three UI-test Swift files are registered once; existing target/resource/build settings and running app/test source files are unchanged. The build attempt failed with `xcodebuild: command not found` (exit 127), so compilation remains unverified. No behavior tests were added for these declaration-only types.
 
-## Follow-up — adopt canonical models in the app
+### Follow-up — adopt canonical models in the app
 
 Authorized: integrate the approved Message, GrammarObservation, and VocabularyObservation models into the actual conversation system. Keep the existing Figma UI, local fixtures, and audio interactions. No evaluator, metric calculation, backend, or statistics screen is added.
 
@@ -258,7 +268,7 @@ Xcode acceptance:
 4. When microphone testing is possible, record/send, re-record the latest audio, cancel/retry, relaunch, and play the latest recording. Both immutable version references/files must remain stored. Confirm failed saves retain the unsent replacement and original audio.
 5. Observation integration currently has no user-facing control. Use the unit cases for source/revision/span validation, original-versus-edit result retention, re-evaluation, relaunch, and failed writes. Do not expect automatic grammar/vocabulary feedback or statistics yet.
 
-## Follow-up — statistics data and extraction
+### Follow-up — statistics data and extraction
 
 Authorized: add the discussed models and extraction code, with no grammar/clause evaluation or statistics UI yet. Tense consistency is removed from this milestone. Every submitted learner original/edit counts as a full practice attempt; word forms remain separate, and vocabulary dates represent first observed use.
 
@@ -282,7 +292,7 @@ Xcode checks: run the unit suite; confirm new files appear under Models and Feat
 
 Apple references: [Natural Language tokenization](https://developer.apple.com/documentation/naturallanguage/tokenizing-natural-language-text), [NLTokenizer](https://developer.apple.com/documentation/naturallanguage/nltokenizer). MATTR reference: [Covington and McFall](https://www.tandfonline.com/doi/abs/10.1080/09296171003643098).
 
-## Follow-up — overall statistics dashboard
+### Follow-up — overall statistics dashboard
 
 Authorized: implement overall user statistics, with flexible layout retaining the app’s cream paper/brown/green styling. Current-conversation statistics remain out of scope. The latest category list restores tense consistency, superseding the earlier omission; calculation version is now practice-statistics-v2.
 
@@ -309,7 +319,7 @@ Mac acceptance:
 
 Apple references: [Swift Charts](https://developer.apple.com/documentation/Charts/Chart), [LineMark series](https://developer.apple.com/documentation/charts/linemark), [chart accessibility guidance](https://developer.apple.com/design/human-interface-guidelines/charts).
 
-## Follow-up — connect committed text to statistics
+### Follow-up — connect committed text to statistics
 
 Authorized: implement the recommended next step and update Markdown documentation. Automatically collect local word/sentence structure from committed learner text and edits; persist it and populate the existing overall dashboard. Keep grammar/clause evaluation, speech recognition, AI integration, and current-conversation statistics out of scope.
 
@@ -337,11 +347,11 @@ Mac acceptance:
 5. Force-quit/relaunch and reopen statistics. Saved inputs and analyses should survive without duplicate counting. A committed message killed before analysis/save should be recovered from missing work. Confirm the read-only/failure tests retain messages and that later writable relaunch fills the missing results.
 6. Verify system exchanges/fixtures/untranscribed recordings do not generate text statistics. Keep the existing recording/playback behavior intact; there is no new permission prompt. Check UI responsiveness on a real device before promising performance.
 
-## Milestone 4 B remainder — current-conversation statistics UI (future; not authorized)
+### Milestone 4 B remainder — current-conversation statistics UI (future; not authorized)
 
 The overall dashboard is implemented in the follow-up above. Implement current-conversation statistics only after a separate request. Acceptance: statistics match defined sample calculations and the app/tests build.
 
-## Milestone 5 A — real text conversations (user-confirmed live; automated Mac testing pending)
+### Milestone 5 A — real text conversations (user-confirmed live; automated Mac testing pending)
 
 The user selected the OpenAI/Cloudflare approach, confirmed initial testers are outside mainland China, created `xiaoliao-api.leeharriswilliamson.workers.dev`, and saved both secrets. The backend is user-deployed, its public health check passed, and the user confirmed live text conversation works after correcting the OpenAI secret name and matching the beta token. Automated Mac validation remains pending. Existing offline fixtures remain isolated in tests/previews. This milestone added no speech service, evaluator, or current-conversation statistics UI; grammar follows in 5 B below.
 
@@ -364,7 +374,7 @@ Validation for this increment: all 16 native Node backend tests passed with mock
 
 Deployment and Mac acceptance are in [BACKEND_SETUP.md](Docs/BACKEND_SETUP.md). Before public distribution, replace the Debug-only shared beta token with real account authentication/ownership and per-user quotas. Later increments can add reviewed grammar/clause evaluation and connect speech transcripts to the same message/statistics path; synthesized speech and pronunciation feedback remain separate future work.
 
-## Milestone 5 B — grammar evaluation (user-confirmed live; automated Mac/model review pending)
+### Milestone 5 B — grammar evaluation (user-confirmed live; automated Mac/model review pending)
 
 The user asked to implement grammar evaluation and explicitly approved automatic evaluation of NEW typed practice messages and NEW text edits only, leaving existing history unevaluated. Use all five already tracked dashboard categories, including tense consistency. Keep chat responsive, preserve immutable edit counting, and use the existing overall dashboard without adding correction/detail screens.
 
@@ -388,7 +398,7 @@ Subsequent user confirmation: grammar statistics work after the missing backend 
 
 Validation: `npm test` passed all 32 mocked backend tests; backend/review JavaScript syntax checks and the offline case listing passed. The project parses with 31 app/ten unit-test/three UI-test Swift files, each registered once in its correct target. Referenced files exist; protected build settings, target configuration, resource/framework phases match the pre-grammar baseline; `git diff --check` passed. The attempted generic simulator build failed with `xcodebuild: command not found` (exit 127). No Swift compilation, XCTest pass, live grammar deployment/request, or actual grammar-quality result is claimed. Stop after this increment and use the linked guide for deployment/Mac/model acceptance.
 
-## Milestone 5 C — on-device speech recognition (implemented; physical-device testing pending)
+### Milestone 5 C — on-device speech recognition (implemented; physical-device testing pending)
 
 The user prioritized speech recognition so recordings can use the same conversation/statistics pipeline, accepted the on-device direction, and confirmed access to both a physical iPhone and a MacBook. They reported microphone playback working on the MacBook. The implementation targets finished recordings, preserves the existing UI/recording behavior, and defers grammar-model quality review under the user's deadline preference.
 
@@ -407,7 +417,7 @@ The user prioritized speech recognition so recordings can use the same conversat
 
 Validation here: all 32 mocked Node backend tests passed. Project source checks passed for 32 app/11 unit-test/three UI-test Swift files, registered once in the proper targets, with all referenced files present. Protected settings match the pre-speech baseline except the two intended microphone-purpose strings; target/resource/framework configuration is unchanged. The attempted generic iOS Simulator build failed with `xcodebuild: command not found` (exit 127). No Swift compilation, executed XCTest pass, native Speech/asset runtime result, physical-device transcription, or voice accuracy result is claimed. Grammar judgment/pronunciation quality remains separate future work. Stop after this increment and validate using the linked speech guide.
 
-## Milestone 5 D — Apple partner text-to-speech (implemented; device testing pending)
+### Milestone 5 D — Apple partner text-to-speech (implemented; device testing pending)
 
 The user requested Apple's built-in version of spoken partner replies. Reuse the existing Play action on complete partner text messages; keep blue system responses text-only and avoid new screens or settings.
 
@@ -419,7 +429,7 @@ The user requested Apple's built-in version of spoken partner replies. Reuse the
 
 Validation: `git diff --check` passed. The project parses with all 32 app/11 unit-test/three UI-test Swift files registered once in their correct targets and all references present. This increment leaves the Xcode project/build settings, resources and backend unchanged. The attempted generic simulator build failed with `xcodebuild: command not found` (exit 127). No Swift compilation, XCTest pass or native synthesis/device acceptance is claimed; run the linked checks on the Mac and physical iPhone/iPad.
 
-## Navigation follow-up — unified Figma menu (implemented; Xcode testing pending)
+### Navigation follow-up — unified Figma menu (implemented; Xcode testing pending)
 
 The user replaced the always-visible three-button navigation with one Menu button, incorporating conversation history into the navigation drawer. They explicitly limited statistics changes to navigation, approved the existing Conversation Settings destination for the drawer gear, and chose a monochrome iOS gear icon.
 
@@ -432,7 +442,7 @@ The user replaced the always-visible three-button navigation with one Menu butto
 
 Validation: `git diff --check` passed. All 32 app/11 unit-test/three UI-test Swift sources are referenced once in the correct targets; the project parses and every reference exists. Compared with the pre-navigation snapshot, the project file changes only the drawer filename. All four bundled menu PDFs are nonempty and match their source viewport dimensions; the shared button composes each 64-point ring with its 32.001 × 19.6759-point glyph. The entire statistics body below its header is byte-for-byte unchanged. The attempted generic simulator build failed with `xcodebuild: command not found` (exit 127); no compilation, UI-test pass or actual SwiftUI visual comparison is claimed. Physical-device/Xcode checks above remain pending. No backend deployment or new secret is needed.
 
-## Recording-control follow-up (implemented; device testing pending)
+### Recording-control follow-up (implemented; device testing pending)
 
 The user confirmed recording works and asked for a clear capture indicator, integrated play/pause inside the green waveform, and a separate Restart button replacing the old Pause/resume-capture control.
 
@@ -444,7 +454,7 @@ The user confirmed recording works and asked for a clear capture indicator, inte
 
 Validation: `git diff --check` and project/reference checks passed (32 app, 11 unit-test and three UI-test Swift files registered once). All seven reused recording artwork assets are nonempty and unchanged. StatisticsDashboardView, root navigation and the Xcode project are byte-for-byte unchanged from HEAD. The attempted generic simulator build failed with `xcodebuild: command not found` (exit 127). No compilation, XCTest pass or actual recording-row rendering/playback/restart acceptance is claimed; the linked device checks remain pending.
 
-## Typed Send button follow-up (implemented; device testing pending)
+### Typed Send button follow-up (implemented; device testing pending)
 
 The user reported that typed messages had no visible Send control. The multiline field previously relied on keyboard submission.
 
@@ -455,7 +465,7 @@ The user reported that typed messages had no visible Send control. The multiline
 
 Validation: `git diff --check` and project/reference checks passed (32 app, 11 unit-test and three UI-test Swift files, each registered once). The generic simulator build attempt returned `xcodebuild: command not found` (exit 127). No Swift compilation, UI-test pass or device rendering result is claimed. No backend deployment, new dependency, asset or project setting is required.
 
-## Grading Mode follow-up (implemented; Mac/device testing pending)
+### Grading Mode follow-up (implemented; Mac/device testing pending)
 
 The user asked for a saved settings toggle so a TA can use English controls/errors while grading. This is display language, independent of conversation settings or evaluation.
 
@@ -467,3 +477,88 @@ The user asked for a saved settings toggle so a TA can use English controls/erro
 - [ ] Build and run localization/unit/UI tests on the Mac. On iPad/iPhone verify both toggle directions without restart, English menus/settings/stats and recording controls, saved/retry errors, app relaunch, software/hardware keyboard, small widths, larger Dynamic Type and VoiceOver. Confirm conversation messages/titles/settings and metric values are unchanged. System-owned permission dialogs continue to follow device language.
 
 Validation: `git diff --check`, translation coverage/placeholder checks and project/reference checks passed. All 212 English entries contain English copy and preserve their interpolation slots; current UI keys are covered. There are 33 app/11 unit-test/three UI-test Swift files, each registered once. Project changes add only AppLocalization.swift to the existing Design group/app Sources; protected settings and resources are unchanged. Canonical models, audio engine, backend and statistics calculations match HEAD. Delimiter checks passed for changed UI/localization/test Swift sources, including nested interpolations; these are not compilation. The attempted generic simulator build failed with `xcodebuild: command not found` (exit 127). The four unit tests and UI persistence/switching regression have not run here; Mac/device acceptance remains pending.
+
+
+### Grading access follow-up (implemented; deployment and Mac testing pending)
+
+The user authorized a separate revocable code so graders can use the paid prototype without developer credentials or an OpenAI/Cloudflare account. English Grading Mode remains independent.
+
+- [x] Add optional XIAOLIAO_GRADING_TOKEN support to both paid Worker routes and an authentication-only POST /v1/access/check. Enforce format and separation from existing secrets; retain existing developer access, shared quotas, validation, cache and provider contracts. Authenticate before cached responses; rotation/deletion denies old codes.
+- [x] Add masked code entry, Verify and save, saved status, inline localized failures and Remove code in existing Conversation Settings. Verify before writing a device-local non-synchronizing Keychain item. Preserve the previous credential on replacement failure; cancel/invalidate late validation on removal/navigation/backgrounding.
+- [x] Resolve saved grading access for every chat/grammar request, including already-running service instances. Support Debug and Release without embedded credentials. Preserve Debug developer fallback only when no grading item exists; storage failures/revoked codes fail closed. Keep pending request IDs/bodies and explicit paid retries unchanged.
+- [x] Add five mocked backend tests and seven focused Swift test methods. Add one isolated UI flow using a public fixture validator and UUID-specific Keychain namespace, covering save/relaunch/remove/rejection without paid calls. Register new files once in correct Xcode groups/Sources and keep documentation out of build phases.
+- [x] Document setup, private handoff, rotation/revocation, troubleshooting, shared limits and Mac checks in [GRADING_ACCESS.md](Docs/GRADING_ACCESS.md); update README, backend setup and project conventions.
+- [ ] Owner: generate a private code, save it as the existing Worker's XIAOLIAO_GRADING_TOKEN Secret, deploy updated Backend and privately hand it to graders. Preserve OpenAI/developer secrets. No deployment or live authenticated provider call was performed here.
+- [ ] On Mac: build and run GradingAccessTests plus reply/grammar/localization regressions. On iPhone/iPad verify saving, Home Screen relaunch without Xcode environment, real chat and grammar, explicit retries, failed replacement preserving access, removal, server revocation, English errors, keyboard/Dynamic Type/VoiceOver layout. The guide includes exact steps.
+
+Validation: all 37 mocked backend tests passed locally, including the five new access cases. Project/reference checks passed with 35 app, 12 unit-test and three UI-test Swift files, each registered once; protected build settings and resource/framework phases are unchanged. JavaScript syntax, `git diff --check`, grading translation coverage and Swift lexical delimiter checks passed (230 English entries, placeholders preserved); those source checks are not compilation. The generic simulator build attempt returned `xcodebuild: command not found` (exit 127). Native XCTest/UI tests and Keychain/SwiftUI runtime acceptance remain pending; no iOS compilation, native test pass, live deployment or paid provider call is claimed.
+
+
+### English error messages follow-up
+
+- Present all existing error bodies in English independently of Grading Mode, including saved audio/chat/transcription/grammar/history/access failures. Keep ordinary controls in the selected interface language and preserve stored history/job contents.
+- Use the existing English error catalog and fallback centrally through AppStrings.error. Route the statistics failure title, recovery explanation and grammar failure explanation through that same path.
+- Update existing localization tests for both interface modes, saved failures, untranslated-Chinese fallback and unchanged English/empty strings. No backend deployment, project registration, dependency or data migration is needed.
+- Mac validation remains required: run XiaoLiaoTests and trigger a failed conversation, audio/history/access error and statistics/grammar failure with Grading Mode off and on. Confirm error bodies stay English and normal interface copy still follows the toggle.
+
+Validation: `git diff --check` passed. The generic simulator build attempt returned `xcodebuild: command not found` (exit 127); Swift compilation and localization XCTest execution remain pending on the Mac. No backend or project-file changes were needed for this follow-up.
+
+
+### Concept 02 visual implementation (source complete; Mac validation pending)
+
+- [x] Read current approved Figma contexts/screens through the SwiftUI/design-to-code workflow. Reuse existing bundled glyphs and theme/color assets; retain project configuration and prior in-progress grading access/error-language changes.
+- [x] Apply deeper green, terracotta accents, warm surfaces, soft borders and regular text across New Conversation, feed, recording/review, text/system composer, history drawer, conversation settings, grading access and statistics. Preserve current navigation, secure entry, audio lifecycle and local data.
+- [x] Present complete playable partner replies as audio cards with an English transcript toggle, without rewriting message modality/history or autoplaying speech. Keep learner speech green/captioned and typed messages white. Use native adaptive rows, stable identifiers and 44-point controls. Expose an independent keyboard switch during recording/review, retaining existing discard behavior.
+- [x] Show static word-position dots using the bundled artwork. Preserve actual playback progress separately; do not simulate word timing. Translation stays unavailable when no real/local fixture result exists. Latest-message-only edits and pending/send guards remain enforced.
+- [x] Keep chart/table structure, category selection, denominators, extraction/calculation code and data models unchanged. Retain English errors in both UI languages; add English presentation copy for the revised labels.
+- [x] Extend the existing injected-reply test to cover transcript selection/toggling and unchanged canonical message metadata, without invoking speech or a paid API. Adapt grading-mode UI test scrolling for the updated settings layout.
+- [ ] On Mac: build and run reply/audio/history/localization tests and navigation/composer UI regressions. Compare with Concept 02 on iPhone and iPad, including small widths, landscape, large Dynamic Type, VoiceOver, keyboard avoidance, caption selection, recording/review/Restart/Send, settings persistence, history, English errors and unchanged statistics values.
+- [ ] Implement actual speech-aligned word/dot highlighting separately. No live word timestamps, stress scoring, new translation backend, automatic partner playback or General Settings screen is claimed here.
+
+The generic simulator build attempt returned `xcodebuild: command not found` (exit 127). No Swift compilation, XCTest success or simulator/device visual match is claimed from this Linux workspace.
+
+Source validation: `git diff --check` passed. Swift lexical delimiter checks passed for 14 relevant source/test files (not compilation). All 253 English entries have unique keys, matching placeholders and English values; revised static copy is covered. All asset catalogs parse and all 38 referenced image files exist/nonempty. The Xcode project is byte-for-byte unchanged from the beginning of this style update, including target settings and build phases. Mac/device visual acceptance remains pending.
+
+## Current increment — current-conversation statistics (source complete; Mac validation pending)
+
+- [x] Add the bundled statistics glyph to the feed’s upper-right corner, with localized label and 44-point action target. Capture its conversation ID in root navigation. Retain the menu’s overall dashboard and provide Return to conversation on the scoped dashboard.
+- [x] Reuse Concept 02 dashboard cards, category selection, daily charts, activity table and honest unknown/coverage states. Filter attempts, grammar, MATTR and daily activity to the selected conversation, including every eligible edit version. Preserve all-history vocabulary first-use before filtering. Reject missing IDs; never substitute overall statistics for an empty/missing session.
+- [x] Scope grammar status/errors and explicit retries to that conversation. Refresh after committed local text/grammar analysis and foregrounding; do not await network evaluation, queue backfills or add summary persistence.
+- [x] Add focused test sources for scoped totals/edit counting/global vocabulary first-use, empty/missing sessions, grammar retry isolation and opening/returning from the feed. Existing overall behavior remains covered by its regressions.
+- [ ] On Mac: build and run StatisticsTests, StatisticsDashboardTests, GrammarEvaluationTests, TextAnalysisPipelineTests and ConversationFlowUITests. Confirm upper-right placement and return/menu routing on iPhone/iPad, small widths, large Dynamic Type, VoiceOver and both interface languages. Compare two conversations with different data; check empty sessions, pending/failed/completed grammar, scoped retry, saved history/relaunch and all-version counting. Confirm no AI work starts merely by opening statistics.
+
+No backend deployment, secret, dependency, asset export, project registration or storage migration is required. Native build/test status and available source checks are recorded after validation below.
+
+Validation for this increment: `git diff --check` passed. Lexical delimiter checks passed for the 11 touched Swift files (not compilation); existing project references, 257 unique localization keys, scoped dashboard/retry call sites, first-use-before-filter ordering and Markdown local links were checked. The generic iOS Simulator build attempt returned `xcodebuild: command not found` (exit 127). The new XCTest/UI-test sources and native regression suites have not run here; no compilation, performance measurement or actual device rendering result is claimed.
+
+## Current increment — explicit learning preferences (source complete; Worker deployment and Mac acceptance pending)
+
+- [x] Add a Concept 02 Learning Preferences card to existing Conversation Settings: multiline input, 2,000 UTF-16-unit limit, explicit Save, clear-by-empty, localized copy and English errors. Persist via an explicitly injected local UserDefaults store; keep plain models/previews isolated and UI tests UUID-scoped.
+- [x] Capture saved overall preferences on every new reply request, including existing conversations, text edits, blue requests and recognized speech. Preserve immutable pending requests/retries. Keep prompt, overall preferences and lasting conversation adjustments distinct.
+- [x] Extend the existing Worker contract/prompt with versioned preferences, precedence, explicit control keys and a validated replacement adjustment summary. Partner turns cannot mutate adjustments. Commit blue summaries/settings/reply/pending removal together; maintain payload version 2 and legacy request/cache readability. Preserve unchanged backend authentication, grammar and quotas.
+- [x] Add mocked backend checks for bounds/versions/precedence instruction separation, partner protection, summary replacement/cancellation and retry snapshot conflicts. Add native test sources for local save/clear/relaunch, request snapshots, existing-conversation changes, persisted blue summaries, explicit controls, legacy decoding/capability detection and isolated settings UI save/relaunch.
+- [ ] Deploy the updated Worker from Backend (`npx wrangler deploy`); reuse existing secrets/bindings. No live deployment or paid model test has been performed in this workspace.
+- [ ] On Mac: build, run ConversationReplyTests, ConversationPersistenceTests, SpeechTranscriptionTests, GrammarEvaluationTests, localization and ConversationFlowUITests. Perform the learning-preference acceptance checklist in Docs/BACKEND_SETUP.md, including long context, blue questions/changes/cancellation, settings changed in flight, failed saves, cross-conversation updates, relaunch, both languages and accessible layouts.
+
+Performance-driven inference, adaptive topic generation, research collection, backend learner-profile storage and model training remain future work. General Settings is still not introduced; the current Concept 02 presentation is retained.
+
+Validation for this increment: all **40 mocked backend tests passed** (`npm test` in Backend), including the three new preference tests; no paid/live calls were made. Source checks passed for lexical delimiters and existing file references across 11 touched Swift files (not compilation), 266 unique localization keys with matching placeholders/settings-copy coverage, all three new-request construction paths, retained payload version 2 and local documentation links. `git diff --check` passed. The generic iOS Simulator build attempt returned `xcodebuild: command not found` (exit 127); native XCTest/UI tests, actual settings rendering, provider interpretation and Worker deployment remain unverified here. No new Swift file/resource registration, dependency, secret, signing/build-setting change or history reset was introduced.
+
+## Context data models (definitions complete; integration deferred)
+
+- [x] Add learning-context-v1 topic, language-task and situation enums using the approved initial tags, with unclassified and multiple-tag support.
+- [x] Add ContextTags, ConversationContext and MessageContextAnalysis, retaining explicit/default/inferred sources and exact message-version metadata.
+- [x] Add PerformanceContext and ContextualPerformanceSummary with category counts, coverage, date range and supporting message/context/grammar opportunity references. Retain logical-message diversity alongside full edit-attempt counting; support a general-skill baseline and document overlapping contexts.
+- [x] Register the three Swift files once in the app Sources phase and Models navigator group. Preserve existing project settings and all runtime behavior.
+- Classification, persistence integration, input/evidence validation, contextual calculations and adaptation remain future work. These are model definitions, not collected performance records or a populated learner profile. Current UI, grammar evaluation, statistics and preferences are unchanged.
+
+Validation: model delimiter checks, taxonomy counts (10/10/7 plus unclassified), unique file references/Sources registrations and `git diff --check` passed. `xcodebuild` is unavailable in this workspace; no successful Swift compilation or native test execution is claimed. No runtime tests were added for these unused value-type definitions.
+
+## Context processing logic and tests (source complete; native validation pending)
+
+- Add pure validated factories for broad conversation context and exact-message context from supplied tags. Reject invalid taxonomy, tags, provenance, dates, confidence, ineligible messages, stale versions and invalid parent links.
+- Add a pure grammar-context summary calculator using current session snapshots and supplied context records, with half-open submission-date filtering, category/subcategory filters, explicit coverage, full edit counting, uncertain exclusions, empty-evaluation evidence, exact supporting IDs and conversation/logical-message diversity. Missing classifications never become guessed tags; overlapping tags do not duplicate counts within a report.
+- Add seven focused ContextPerformanceTests covering factories/round trips/default links, invalid tags/revisions/confidence, originals/edits/outcomes, missing context versus unknown/empty evaluations, excluded content, taxonomy/text-source failures, interval boundaries and duplicate/orphan records. Register calculator and test sources once in the correct groups/targets.
+- No automatic classification, persistence integration, history migration, new AI calls, UI changes or partner adaptation. Future consumers explicitly call these functions with available inputs.
+
+Validation: delimiter checks passed for the processor, summary model and test source; unique project file references and Sources registrations were checked. Seven native test methods are present and `git diff --check` passed. The attempted generic iOS Simulator build returned `xcodebuild: command not found` (exit 127). Run ContextPerformanceTests plus StatisticsTests and existing observation/persistence regressions on the Mac. No Swift compilation or XCTest pass is claimed here.

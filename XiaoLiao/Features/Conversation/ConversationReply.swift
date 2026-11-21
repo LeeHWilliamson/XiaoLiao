@@ -16,9 +16,20 @@ nonisolated struct ConversationReplyRequest: Codable, Equatable, Sendable {
     let messages: [Turn]
     let replyToMessageID: String?
     let kind: Kind
+    let overallPreferences: String?
+    let conversationAdjustments: String?
+    let explicitSettingKeys: [ConversationSettings.Key]?
+    let preferencesVersion: Int?
 
-    init(session: ConversationSession, replyingTo message: Message? = nil) throws {
+    init(session: ConversationSession, replyingTo message: Message? = nil, overallPreferences: String = "") throws {
         guard session.prompt.utf16.count <= 4000 else { throw ConversationReplyError.tooLong }
+        guard overallPreferences.utf16.count <= 2000, (session.conversationAdjustments?.utf16.count ?? 0) <= 2000 else {
+            throw ConversationReplyError.server("Learning preferences or conversation adjustments exceed the 2,000-character limit.")
+        }
+        self.overallPreferences = overallPreferences
+        conversationAdjustments = session.conversationAdjustments ?? ""
+        explicitSettingKeys = session.explicitSettingKeys
+        preferencesVersion = 1
         requestID = UUID().uuidString
         conversationID = session.id
         prompt = session.prompt
@@ -65,9 +76,24 @@ nonisolated struct ConversationReplyResponse: Codable, Equatable, Sendable {
     let settings: ConversationSettings
     let model: String
     let promptVersion: String
+    var conversationAdjustments: String? = ""
+    var preferencesVersion: Int? = 1
+    var explicitSettingKeys: [ConversationSettings.Key]? = []
 
     func validate(for request: ConversationReplyRequest) throws {
-        guard requestID == request.requestID, conversationID == request.conversationID,
+        if request.preferencesVersion == 1 {
+            guard preferencesVersion == 1 else {
+                throw ConversationReplyError.server("The AI service needs an update to support learning preferences. Please deploy the latest Worker and retry.")
+            }
+            guard let conversationAdjustments, conversationAdjustments.utf16.count <= 2000,
+                  let explicitSettingKeys, Set(explicitSettingKeys).count == explicitSettingKeys.count,
+                  kind == .system || Set(explicitSettingKeys) == Set(request.explicitSettingKeys ?? ConversationSettings.Key.allCases) else {
+                throw ConversationReplyError.invalidResponse
+            }
+        }
+        guard (conversationAdjustments?.utf16.count ?? 0) <= 2000,
+              request.preferencesVersion == nil || kind == .system || conversationAdjustments == (request.conversationAdjustments ?? ""),
+              requestID == request.requestID, conversationID == request.conversationID,
               replyToMessageID == request.replyToMessageID, kind == request.kind,
               !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, text.utf16.count <= 6000,
               !model.isEmpty, !promptVersion.isEmpty,
@@ -86,7 +112,7 @@ nonisolated enum ConversationReplyError: Error, LocalizedError, Sendable {
     case server(String)
     var errorDescription: String? {
         switch self {
-        case .notConfigured: "AI 服务尚未配置，请联系测试管理员。"
+        case .notConfigured: "请在设置中输入评分访问码，或联系测试管理员配置 AI 访问。"
         case .tooLong: "主题或消息过长，最多支持 4000 字符。请缩短后重试。"
         case .invalidResponse: "收到的回复无效，请重试。"
         case .unavailable: "网络连接失败或回复超时，请检查网络后重试。"
@@ -102,6 +128,13 @@ nonisolated struct ConversationReplyService: Sendable {
     }
     let baseURL: URL
     let betaToken: String?
+    private let gradingTokenProvider: (@Sendable () throws -> String?)?
+
+    init(baseURL: URL, betaToken: String?, gradingTokenProvider: (@Sendable () throws -> String?)? = nil) {
+        self.baseURL = baseURL
+        self.betaToken = betaToken
+        self.gradingTokenProvider = gradingTokenProvider
+    }
 
     static func configured() -> ConversationReplyService {
         var url = URL(string: "https://xiaoliao-api.leeharriswilliamson.workers.dev")!
@@ -115,8 +148,21 @@ nonisolated struct ConversationReplyService: Sendable {
             url = override
         }
         #endif
-        // This private-beta credential is deliberately not embedded in Release builds.
-        return ConversationReplyService(baseURL: url, betaToken: token)
+        // The development credential is never embedded. Graders enter their own
+        // separate code; read it per request so a running service sees replacements.
+        return ConversationReplyService(baseURL: url, betaToken: token,
+                                        gradingTokenProvider: { try GradingCredentialStore().load() })
+    }
+
+    func accessCredential() throws -> (token: String, isGrading: Bool) {
+        do {
+            if let saved = try gradingTokenProvider?() {
+                guard (try? GradingAccessCode.normalized(saved)) == saved else { throw GradingAccessError.secureStorage }
+                return (saved, true)
+            }
+        } catch { throw ConversationReplyError.server(GradingAccessError.secureStorage.localizedDescription) }
+        guard let betaToken, betaToken.count >= 32 else { throw ConversationReplyError.notConfigured }
+        return (betaToken, false)
     }
 
     func respond(to request: ConversationReplyRequest) async throws -> ConversationReplyResponse {
@@ -126,12 +172,12 @@ nonisolated struct ConversationReplyService: Sendable {
     }
 
     func send<Input: Encodable & Sendable, Output: Decodable & Sendable>(_ request: Input, path: String) async throws -> Output {
-        guard let betaToken, betaToken.count >= 32 else { throw ConversationReplyError.notConfigured }
+        let access = try accessCredential()
         var http = URLRequest(url: baseURL.appendingPathComponent(path))
         http.httpMethod = "POST"
         http.timeoutInterval = 50
         http.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        http.setValue("Bearer \(betaToken)", forHTTPHeaderField: "Authorization")
+        http.setValue("Bearer \(access.token)", forHTTPHeaderField: "Authorization")
         http.httpBody = try JSONEncoder().encode(request)
         let data: Data
         let response: URLResponse
@@ -139,6 +185,9 @@ nonisolated struct ConversationReplyService: Sendable {
         catch { throw ConversationReplyError.unavailable }
         guard let response = response as? HTTPURLResponse else { throw ConversationReplyError.invalidResponse }
         guard response.statusCode == 200 else {
+            if response.statusCode == 401, access.isGrading {
+                throw ConversationReplyError.server(GradingAccessError.invalidCode.localizedDescription)
+            }
             if let failure = try? JSONDecoder().decode(Failure.self, from: data), failure.error.message.count <= 300 {
                 throw ConversationReplyError.server(failure.error.message)
             }

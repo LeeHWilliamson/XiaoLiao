@@ -1,6 +1,6 @@
 # Grammar evaluation v1
 
-Authorized scope: automatically evaluate **newly submitted text-backed practice messages and each new edit**, without backfilling existing history. The existing overall grammar charts consume the saved observations. This increment does not add inline correction screens, speech recognition, vocabulary judgment, clause counting, or current-conversation statistics.
+Authorized scope: automatically evaluate **newly submitted text-backed practice messages and each new edit**, without backfilling existing history. The existing overall grammar charts consume the saved observations. This evaluator does not add inline correction screens, vocabulary judgment, clause counting or current-conversation statistics. The later on-device speech feature queues transcripts of newly sent recordings/replacements through this same contract; old recordings remain untouched. Current dashboard presentation follows [Concept 02](../AGENTS.md#design-source-and-constraints); error explanations are always English, and ordinary controls follow Grading Mode.
 
 ## Deploy and try it
 
@@ -11,9 +11,9 @@ npm test
 npx wrangler deploy
 ```
 
-No new secret, storage binding, migration, model account, or Xcode environment variable is required. Reuse the working `OPENAI_API_KEY`, Cloudflare `XIAOLIAO_CLIENT_TOKEN`, and local Xcode `XIAOLIAO_API_TOKEN`. The first key name must include **OPENAI**, not `OPEN_API_KEY`. Build and run the updated Swift app after deploying the Worker. Existing saved messages stay unevaluated; send a NEW message or commit a NEW edit to queue grammar work.
+No new secret, storage binding, migration, model account, or Xcode environment variable is required. Reuse the working `OPENAI_API_KEY` and Cloudflare `XIAOLIAO_CLIENT_TOKEN`; the client can use local Xcode `XIAOLIAO_API_TOKEN` in Debug or a verified Keychain grading code (see [grader access](GRADING_ACCESS.md)). The first key name must include **OPENAI**, not `OPEN_API_KEY`. Build and run the updated Swift app after deploying the Worker. Existing saved messages stay unevaluated; send a NEW message or commit a NEW edit to queue grammar work.
 
-If grammar statistics do not change, check the backend route separately from the app version. A live unauthenticated probe after the user's report returned HTTP 404 with `not_found`; the deployed Worker did not expose the grammar route even though the app was updated. Run `npx wrangler deploy` from the **Backend folder in the same updated checkout**. Then use **重试语法分析** in statistics to retry the saved failed jobs.
+If grammar statistics do not change, check the backend route separately from the app version. During initial setup, a probe returned HTTP 404 with `not_found` because that deployment lacked the grammar route. The user subsequently confirmed live grammar statistics work; the earlier 404 is troubleshooting history, not the current deployment status. Run `npx wrangler deploy` from the **Backend folder in the same updated checkout**. Then use **重试语法分析** in statistics to retry the saved failed jobs.
 
 This diagnostic request contains no credentials or learner text and cannot call OpenAI:
 

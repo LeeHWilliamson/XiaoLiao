@@ -11,7 +11,7 @@ const example = () => ({
 const upstream = (reply = { text: "Welcome! What would you like to drink?", settings: defaults }) => Response.json({
   id: "resp_test", status: "completed", output: [
     { type: "reasoning", summary: [] },
-    { type: "message", role: "assistant", content: [{ type: "output_text", text: JSON.stringify(reply) }] }
+    { type: "message", role: "assistant", content: [{ type: "output_text", text: JSON.stringify({ conversationAdjustments: "", explicitSettingKeys: [], ...reply }) }] }
   ]
 });
 function post(body = example(), token = TOKEN, headers = {}) {
@@ -67,7 +67,7 @@ test("provider request uses Responses, bounded output, strict schema, and unpriv
   assert.equal(body.model, "chosen-on-server");
   assert.equal(body.store, false);
   assert.equal(body.reasoning.effort, "none");
-  assert.equal(body.max_output_tokens, 900);
+  assert.equal(body.max_output_tokens, 1800);
   assert.equal(body.text.format.strict, true);
   assert.equal(body.text.format.schema.additionalProperties, false);
   assert.equal(body.input[0].role, "user");
@@ -90,7 +90,7 @@ test("raw Responses output is parsed after reasoning items; keys never leave the
   assert.equal(body.requestID, request.requestID);
   assert.equal(body.conversationID, request.conversationID);
   assert.equal(body.model, "gpt-6.1-terra");
-  assert.equal(body.promptVersion, "xiaoliao-text-v1");
+  assert.equal(body.promptVersion, "xiaoliao-text-v2-preferences");
   assert.ok(!JSON.stringify(body).includes("server-only-test-key"));
 });
 test("system requests return only a system answer and validated changed settings", async t => {
@@ -199,4 +199,68 @@ test("alarm removes expired cached replies without retaining prompt/history text
   await storage.put(key, { ...cached, expiresAt: 0 });
   await gateway.alarm();
   assert.equal(await storage.get(key), undefined);
+});
+
+test("versioned preferences are bounded, typed, and preserved as separate unprivileged fields", () => {
+  const request = { ...example(), preferencesVersion: 1, overallPreferences: "Travel and short answers.",
+    conversationAdjustments: "Ask one question at a time.", explicitSettingKeys: ["tone"] };
+  const validated = validateRequest(request);
+  assert.equal(validated.overallPreferences, request.overallPreferences);
+  assert.equal(validated.conversationAdjustments, request.conversationAdjustments);
+  assert.deepEqual(validated.explicitSettingKeys, ["tone"]);
+  const body = providerBody(validated, "test");
+  assert.equal(JSON.parse(body.input[0].content).overallPreferences, request.overallPreferences);
+  assert.ok(!body.instructions.includes(request.overallPreferences));
+  assert.match(body.instructions, /prompt overrides conflicting overallPreferences/);
+  assert.match(body.instructions, /Questions and one-off requests/);
+  assert.match(body.instructions, /explicitSettingKeys/);
+  assert.ok(body.text.format.schema.required.includes("conversationAdjustments"));
+  for (const change of [ { preferencesVersion: 2 }, { overallPreferences: "x".repeat(2001) },
+    { overallPreferences: 123 }, { conversationAdjustments: [] }, { conversationAdjustments: "x".repeat(2001) },
+    { explicitSettingKeys: ["tone", "tone"] }, { explicitSettingKeys: ["admin"] }, { explicitSettingKeys: null } ]) {
+    assert.throws(() => validateRequest({ ...request, ...change }));
+  }
+  assert.throws(() => validateRequest({ ...example(), overallPreferences: "Missing version" }));
+  const legacy = validateRequest(example());
+  assert.equal(Object.hasOwn(legacy, "preferencesVersion"), false); // Retain the old retry hash shape.
+});
+
+test("partner cannot rewrite lasting adjustments and blue responses can replace or clear them", async () => {
+  const request = validateRequest({ ...example(), preferencesVersion: 1, overallPreferences: "Travel.",
+    conversationAdjustments: "Talk about hiking.", explicitSettingKeys: [] });
+  const partner = await generateReply(request, {}, async () => upstream({ text: "Where did you hike?",
+    settings: defaults, conversationAdjustments: "Change the global profile." }));
+  assert.equal(partner.conversationAdjustments, request.conversationAdjustments);
+  assert.equal(partner.preferencesVersion, 1);
+  assert.deepEqual(partner.explicitSettingKeys, request.explicitSettingKeys);
+  const system = validateRequest({ ...request, kind: "system", replyToMessageID: "blue", messages: [
+    { id: "blue", role: "user", purpose: "systemAssistance", text: "Return to the original topic." }
+  ] });
+  for (const summary of ["Ask one question at a time.", ""]) {
+    const result = await generateReply(system, {}, async () => upstream({ text: "好的。", settings: defaults,
+      conversationAdjustments: summary, explicitSettingKeys: summary ? ["replyLength"] : [] }));
+    assert.deepEqual(result.explicitSettingKeys, summary ? ["replyLength"] : []);
+    assert.equal(result.conversationAdjustments, summary);
+    assert.equal(result.kind, "system");
+  }
+  await assert.rejects(generateReply(system, {}, async () => upstream({ text: "好的。", settings: defaults,
+    conversationAdjustments: "x".repeat(2001) })));
+  await assert.rejects(generateReply(system, {}, async () => upstream({ text: "好的。", settings: defaults,
+    conversationAdjustments: null })));
+  for (const keys of [null, ["admin"], ["tone", "tone"]]) {
+    await assert.rejects(generateReply(system, {}, async () => upstream({ text: "好的。", settings: defaults,
+      conversationAdjustments: "", explicitSettingKeys: keys })));
+  }
+});
+
+test("retry identity includes the saved preference snapshot", async t => {
+  const { send } = runtime();
+  let calls = 0;
+  t.mock.method(globalThis, "fetch", async () => { calls++; return upstream(); });
+  const request = { ...example(), preferencesVersion: 1, overallPreferences: "Travel.",
+    conversationAdjustments: "", explicitSettingKeys: [] };
+  assert.equal((await send(post(request))).status, 200);
+  assert.equal((await send(post(request))).status, 200);
+  assert.equal((await send(post({ ...request, overallPreferences: "Work." }))).status, 409);
+  assert.equal(calls, 1);
 });

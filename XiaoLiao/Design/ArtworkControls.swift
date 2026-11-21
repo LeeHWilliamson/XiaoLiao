@@ -1,29 +1,31 @@
 import SwiftUI
 
-/// Original Figma layers, composed at their original proportions.
+/// Reuses the bundled glyphs inside the approved rounded concept controls.
 struct ArtworkIcon: View {
     let glyph: FigmaArtwork
     var ring: FigmaArtwork = .controlRing
-    var size: CGFloat = 64
+    var size: CGFloat = 44
     var isActive = false
 
     var body: some View {
-        // The microphone glyph comes from the 53-point text composer.
-        let scale = size / (glyph == .microphoneGlyph ? 53 : ring.size.width)
-        ZStack {
-            if isActive {
-                Circle().fill(XiaoLiaoTheme.green).padding(1)
+        let bound: CGFloat = glyph == .menuGlyph || glyph == .menuOpenGlyph ? 22 : 24
+        let scale = min(bound / glyph.size.width, bound / glyph.size.height)
+        let isSend = glyph == .sendAudioGlyph
+        let isMenu = glyph == .menuGlyph || glyph == .menuOpenGlyph
+        Image(glyph.rawValue)
+            .renderingMode(.template)
+            .resizable()
+            .scaledToFit()
+            .frame(width: glyph.size.width * scale, height: glyph.size.height * scale)
+            .foregroundStyle(isSend || isActive ? XiaoLiaoTheme.surface : isMenu ? XiaoLiaoTheme.red : XiaoLiaoTheme.ink)
+            .frame(width: size, height: size)
+            .background(isSend ? XiaoLiaoTheme.red : isActive ? XiaoLiaoTheme.green : XiaoLiaoTheme.surface,
+                        in: RoundedRectangle(cornerRadius: 16))
+            .overlay {
+                RoundedRectangle(cornerRadius: 16)
+                    .strokeBorder(isSend || isActive ? Color.clear : XiaoLiaoTheme.border, lineWidth: 1)
             }
-            FigmaImage(artwork: ring)
-            Image(glyph.rawValue)
-                .renderingMode(isActive ? .template : .original)
-                .resizable()
-                .scaledToFit()
-                .foregroundStyle(.white)
-                .frame(width: glyph.size.width * scale, height: glyph.size.height * scale)
-        }
-        .frame(width: size, height: size)
-        .accessibilityHidden(true)
+            .accessibilityHidden(true)
     }
 }
 
@@ -32,7 +34,7 @@ struct ArtworkButton: View {
     let label: String
     let glyph: FigmaArtwork
     var ring: FigmaArtwork = .controlRing
-    var size: CGFloat = 64
+    var size: CGFloat = 44
     var isActive = false
     var isAvailable = true
     var unavailableHint = "将在后续版本中提供"
@@ -46,23 +48,47 @@ struct ArtworkButton: View {
         }
         .buttonStyle(.plain)
         .disabled(!isAvailable)
+        .opacity(isAvailable ? 1 : 0.45)
         .accessibilityLabel(strings(label))
         .accessibilityHint(isAvailable ? "" : strings(unavailableHint))
     }
 }
 
-/// This is custom artwork in Figma, rather than a standard titled navigation bar.
 struct ConversationHeader: View {
     let onMenu: () -> Void
+    var onStatistics: (() -> Void)? = nil
+    @Environment(\.appStrings) private var strings
+    var title = "小聊"
+    var subtitle: String? = nil
+    var titleFont: Font = .headline
+
+    init(title: String = "小聊", subtitle: String? = nil, titleFont: Font = .headline, onStatistics: (() -> Void)? = nil, onMenu: @escaping () -> Void) {
+        self.onStatistics = onStatistics
+        self.title = title
+        self.subtitle = subtitle
+        self.onMenu = onMenu
+        self.titleFont = titleFont
+    }
 
     var body: some View {
-        HStack {
+        HStack(spacing: 16) {
             NavigationMenuButton(action: onMenu)
-            Spacer()
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title).font(titleFont)
+                    .accessibilityAddTraits(.isHeader)
+                if let subtitle {
+                    Text(subtitle).font(.caption).foregroundStyle(XiaoLiaoTheme.muted)
+                        .lineLimit(2)
+                }
+            }
+            Spacer(minLength: 0)
+            if let onStatistics {
+                ArtworkButton(label: strings("本次对话统计"), glyph: .statsGlyph, action: onStatistics)
+                    .accessibilityIdentifier("conversation.statistics")
+            }
         }
         .padding(.horizontal, 28)
-        .padding(.top, 8)
-        .padding(.bottom, 8)
+        .padding(.vertical, 16)
     }
 }
 
@@ -73,8 +99,7 @@ struct NavigationMenuButton: View {
 
     var body: some View {
         ArtworkButton(label: isExpanded ? strings("关闭菜单") : strings("打开菜单"),
-                      glyph: isExpanded ? .menuOpenGlyph : .menuGlyph,
-                      ring: isExpanded ? .menuOpenRing : .menuRing, action: action)
+                      glyph: isExpanded ? .menuOpenGlyph : .menuGlyph, action: action)
             .accessibilityValue(isExpanded ? strings("已展开") : strings("已收起"))
             .accessibilityIdentifier(isExpanded ? "menu.close" : "navigation.menu")
     }

@@ -3,7 +3,7 @@ import Foundation
 /// Pure, repeatable extraction from supplied records. Call away from the UI
 /// actor for large histories. Rebuilding never appends duplicate activity.
 nonisolated enum StatisticsCalculator {
-    enum CalculationError: Error { case invalidConfiguration, duplicateIdentity, countOverflow }
+    enum CalculationError: Error { case invalidConfiguration, duplicateIdentity, countOverflow, unknownConversation }
 
     private struct Attempt {
         let message: Message
@@ -13,13 +13,16 @@ nonisolated enum StatisticsCalculator {
 
     static func snapshot(sessions: [ConversationSession], configuration: StatisticsConfiguration = .init(),
                          interval: DateInterval? = nil, calendar: Calendar = .current,
-                         computedAt: Date = Date()) throws -> StatisticsSnapshot {
+                         computedAt: Date = Date(), conversationID: String? = nil) throws -> StatisticsSnapshot {
         guard configuration.mattrWindowSize > 0, configuration.normalizationVersion == WordForm.version,
               computedAt.timeIntervalSince1970.isFinite,
               interval.map({ $0.start.timeIntervalSince1970.isFinite && $0.end.timeIntervalSince1970.isFinite }) ?? true else {
             throw CalculationError.invalidConfiguration
         }
         guard Set(sessions.map(\.id)).count == sessions.count else { throw CalculationError.duplicateIdentity }
+        if let conversationID, !sessions.contains(where: { $0.id == conversationID }) {
+            throw CalculationError.unknownConversation
+        }
         var attempts: [Attempt] = []
         var seenIDs = Set<String>()
         for session in sessions {
@@ -51,13 +54,14 @@ nonisolated enum StatisticsCalculator {
             $0.firstUsedAt == $1.firstUsedAt ? $0.wordForm < $1.wordForm : $0.firstUsedAt < $1.firstUsedAt
         }
         let selected = attempts.filter { attempt in
-            interval.map { attempt.message.createdAt >= $0.start && attempt.message.createdAt < $0.end } ?? true
+            (conversationID == nil || attempt.message.conversationID == conversationID) &&
+            (interval.map { attempt.message.createdAt >= $0.start && attempt.message.createdAt < $0.end } ?? true)
         }
         // Each first-use entry belongs to exactly one version. This lookup avoids
         // scanning the vocabulary inventory for every conversation or day.
         let newWordsByMessage = Dictionary(grouping: history, by: \.firstMessageID).mapValues(\.count)
         let byConversation = Dictionary(grouping: selected, by: { $0.message.conversationID })
-        let conversations = try sessions.map { session in
+        let conversations = try sessions.filter { conversationID == nil || $0.id == conversationID }.map { session in
             ConversationStatisticsSummary(conversationID: session.id,
                 statistics: try summarize(byConversation[session.id] ?? [], configuration: configuration, newWords: newWordsByMessage))
         }

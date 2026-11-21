@@ -4,273 +4,248 @@ struct MessageRow: View {
     @Environment(\.appStrings) private var strings
     let viewModel: ConversationViewModel
     let message: Message
-    @ScaledMetric(relativeTo: .title3) private var messageSize: CGFloat = 20
-    @ScaledMetric(relativeTo: .title2) private var systemMessageSize: CGFloat = 24
 
     private var isSelected: Bool { viewModel.selectedMessageID == message.id }
+    private var isPartner: Bool { message.senderRole == .aiPartner }
+    private var isSpokenLearner: Bool { message.senderRole == .user && message.modality == .spoken }
+    private var sourceText: String? {
+        if let transcript = message.transcription?.text { return transcript }
+        if case let .text(text) = message.content { return text }
+        return nil
+    }
+    private var showsAudio: Bool {
+        if case .audio = message.content { return true }
+        return isSpokenLearner || (isPartner && message.status == .complete && sourceText?.isEmpty == false)
+    }
+    private var foreground: Color { isSpokenLearner ? XiaoLiaoTheme.surface : XiaoLiaoTheme.ink }
+    private var duration: String {
+        if let seconds = message.audioAttachment?.durationSeconds { return strings("\(Int(seconds.rounded(.up)))秒") }
+        return strings("语音")
+    }
 
     var body: some View {
         if message.purpose == .systemAssistance, case let .text(text) = message.content {
-            systemRow(text: text)
+            systemRow(text)
         } else {
-            switch message.content {
-            case let .audio(attachment):
-                if message.senderRole == .aiPartner {
-                    audioRow(duration: attachment.durationSeconds)
-                } else {
-                    textRow(text: message.transcription?.text ?? strings("语音消息 · \(durationLabel(attachment.durationSeconds))"))
+            HStack(alignment: .top, spacing: 12) {
+                if !isPartner {
+                    Spacer(minLength: isSelected ? 0 : 48)
+                    if isSelected { actionRail }
                 }
-            case let .text(text):
-                textRow(text: text)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(isPartner ? strings("对方") : strings("我"))
+                        .font(.caption).foregroundStyle(XiaoLiaoTheme.muted)
+                    if showsAudio { audioBubble } else { textBubble }
+                    detailCard
+                }
+                .frame(maxWidth: 300, alignment: .leading)
+                if isPartner {
+                    if isSelected { actionRail }
+                    Spacer(minLength: isSelected ? 0 : 48)
+                }
             }
+            .padding(.horizontal, 28)
         }
     }
 
-    private func durationLabel(_ duration: TimeInterval?) -> String {
-        duration.map { strings("\(Int($0.rounded(.up)))秒") } ?? strings("时长未知")
-    }
-
-    private func systemRow(text: String) -> some View {
+    private func systemRow(_ text: String) -> some View {
         let isResponse = message.senderRole == .system
-        return HStack(alignment: .top, spacing: 0) {
-            if !isResponse { Spacer(minLength: 64) }
-            Text(text)
-                .font(.system(size: systemMessageSize))
-                .multilineTextAlignment(.leading)
+        return HStack {
+            if !isResponse { Spacer(minLength: 48) }
+            VStack(alignment: .leading, spacing: 8) {
+                Text(isResponse ? strings("系统") : strings("对系统说"))
+                    .font(.caption)
+                Text(text).font(.body)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .foregroundStyle(isResponse ? XiaoLiaoTheme.surface : XiaoLiaoTheme.systemRequestText)
+            .padding(16)
+            .frame(maxWidth: 300, alignment: .leading)
+            .background(isResponse ? XiaoLiaoTheme.systemResponse : XiaoLiaoTheme.systemRequest,
+                        in: RoundedRectangle(cornerRadius: 20))
+            .accessibilityLabel("\(isResponse ? strings("小聊系统回复") : strings("我发给小聊系统的消息"))：\(text)")
+            .accessibilityIdentifier("message.\(message.logicalMessageID)")
+            if isResponse { Spacer(minLength: 48) }
+        }
+        .padding(.horizontal, 28)
+    }
+
+    private var audioBubble: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Button {
+                    if !isSelected { viewModel.selectMessage(message.id) }
+                    viewModel.perform(.play, on: message.id)
+                } label: {
+                    Image((isPlaying ? FigmaArtwork.pauseGlyph : .playGlyph).rawValue)
+                        .renderingMode(.template).resizable().scaledToFit()
+                        .frame(width: 18, height: 22)
+                        .frame(minWidth: 44, minHeight: 44)
+                }
+                .buttonStyle(.plain)
+                .disabled(!viewModel.isAvailable(.play, for: message))
+                .opacity(viewModel.isAvailable(.play, for: message) ? 1 : 0.45)
+                .accessibilityLabel(isPlaying ? strings("暂停播放") : strings("播放"))
+                .accessibilityIdentifier("audio.play.\(message.id)")
+
+                Button { viewModel.selectMessage(message.id) } label: {
+                    HStack(spacing: 12) {
+                        if let sourceText, !sourceText.isEmpty {
+                            MessageRhythmDots(text: sourceText)
+                        } else {
+                            Image(FigmaArtwork.recordingWaveLead.rawValue)
+                                .renderingMode(.template).resizable().scaledToFit()
+                                .frame(maxWidth: 84, maxHeight: 30)
+                        }
+                        Text(duration).font(.subheadline).foregroundStyle(foreground).fixedSize()
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(isPartner ? strings("对话伙伴的语音，\(duration)") : strings("语音消息 · \(duration)"))
+                .accessibilityValue(isSelected ? strings("已选择") : strings("未选择"))
+                .accessibilityHint(strings("轻点显示或隐藏消息操作"))
+                .accessibilityIdentifier("message.\(message.logicalMessageID)")
+            }
+            if (!isPartner || viewModel.details[message.id] == .transcript), let sourceText {
+                Text(sourceText).font(.body).foregroundStyle(foreground)
+                    .onTapGesture { viewModel.selectMessage(message.id) }
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("\(isPartner ? "detail" : "caption").\(message.id)")
+            }
+            if viewModel.audio.playbackID == message.id, viewModel.audioClip(for: message) != nil {
+                ProgressView(value: viewModel.audio.playbackProgress)
+                    .tint(foreground)
+                    .accessibilityLabel(strings("播放"))
+                    .accessibilityValue(strings("播放进度\(Int(viewModel.audio.playbackProgress * 100))%"))
+                    .accessibilityIdentifier("playback.\(message.id)")
+            }
+        }
+        .foregroundStyle(isSpokenLearner ? XiaoLiaoTheme.surface : XiaoLiaoTheme.green)
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(isSpokenLearner ? XiaoLiaoTheme.green : XiaoLiaoTheme.surface,
+                    in: RoundedRectangle(cornerRadius: 20))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20)
+                .strokeBorder(isSelected ? XiaoLiaoTheme.green : isSpokenLearner ? .clear : XiaoLiaoTheme.border, lineWidth: 1)
+        }
+    }
+
+    private var textBubble: some View {
+        Button { viewModel.selectMessage(message.id) } label: {
+            Text(sourceText ?? "")
+                .font(.body).multilineTextAlignment(.leading)
                 .fixedSize(horizontal: false, vertical: true)
-                .foregroundStyle(isResponse ? .white : XiaoLiaoTheme.systemRequestText)
-                .padding(14)
-                .frame(maxWidth: .infinity, minHeight: 147, alignment: .topLeading)
-                .background(isResponse ? XiaoLiaoTheme.systemResponse : XiaoLiaoTheme.systemRequest)
-                .clipShape(RoundedRectangle(cornerRadius: 20))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 20)
-                        .strokeBorder(isResponse ? .white : .black, lineWidth: isResponse ? 4 : 2)
-                }
-                .overlay(alignment: .bottomTrailing) {
-                    if !isResponse {
-                        FigmaImage(artwork: .textTail)
-                            .frame(width: 17.2822, height: 23.3026)
-                            .rotationEffect(.degrees(150))
-                            .offset(x: 4, y: 8)
-                    }
-                }
-                .frame(maxWidth: 225)
-                .accessibilityLabel("\(isResponse ? strings("小聊系统回复") : strings("我发给小聊系统的消息"))：\(text)")
-                .accessibilityIdentifier("message.\(message.logicalMessageID)")
-            if isResponse { Spacer(minLength: 64) }
+                .foregroundStyle(foreground)
+                .padding(16)
+                .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+                .xiaoLiaoCard()
         }
-        .padding(.leading, isResponse ? 53 : 24)
-        .padding(.trailing, isResponse ? 24 : 69)
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(isPartner ? strings("对话伙伴的消息") : strings("我的消息"))：\(sourceText ?? "")")
+        .accessibilityValue(isSelected ? strings("已选择") : strings("未选择"))
+        .accessibilityHint(strings("轻点显示或隐藏消息操作"))
+        .accessibilityIdentifier("message.\(message.logicalMessageID)")
     }
 
-    private func audioRow(duration: TimeInterval?) -> some View {
-        HStack(alignment: .top, spacing: 0) {
-            VStack(alignment: .leading, spacing: 14) {
-                Button {
-                    viewModel.selectMessage(message.id)
-                } label: {
-                    FigmaImage(artwork: .audioOval)
-                        .frame(width: 209, height: 86)
-                        .overlay {
-                            HStack(spacing: 22) {
-                                FigmaImage(artwork: .speakingGlyph)
-                                    .frame(width: 51.19, height: 51.2245)
-                                Text(duration.map { "\(Int($0.rounded(.up))) sec" } ?? strings("语音"))
-                                    .font(.callout.bold())
-                                    .foregroundStyle(Color(white: 146.0 / 255))
-                            }
+    private var isPlaying: Bool { viewModel.audio.playbackID == message.id && viewModel.audio.isPlaying }
+
+    private var actionRail: some View {
+        VStack(spacing: 8) {
+            ForEach(viewModel.actions(for: message)) { action in
+                Button { viewModel.perform(action, on: message.id) } label: {
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 6) {
+                            actionGlyph(action).frame(width: 16, height: 18)
+                            Text(actionTitle(action)).font(.caption)
                         }
-                        .overlay(alignment: .bottomLeading) {
-                            FigmaImage(artwork: .audioTail)
-                                .frame(width: 17.2822, height: 23.3026)
-                                .rotationEffect(.degrees(-154.56))
-                                .offset(x: 10, y: -2)
-                        }
+                        actionGlyph(action).frame(width: 20, height: 22)
+                    }
+                    .foregroundStyle(XiaoLiaoTheme.green)
+                    .frame(width: 64)
+                    .frame(minHeight: 44)
+                    .xiaoLiaoCard(cornerRadius: 16)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 16)
+                            .strokeBorder(isActive(action) ? XiaoLiaoTheme.green : .clear, lineWidth: 1)
+                    }
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(strings("对话伙伴的语音，\(durationLabel(duration))"))
-                .accessibilityValue(isSelected ? strings("已选择") : strings("未选择"))
-                .accessibilityHint(strings("轻点显示或隐藏消息操作"))
-                .accessibilityIdentifier("message.\(message.logicalMessageID)")
-                .overlay(alignment: .topTrailing) {
-                    if isSelected {
-                        actionRail(isAudio: true)
-                            .offset(x: 30, y: -10)
-                    }
-                }
-                .padding(.leading, 22)
-
-                detailCard
-            }
-            Spacer(minLength: 64)
-        }
-        .padding(.leading, 16)
-    }
-
-    private func textRow(text: String) -> some View {
-        let isPartner = message.senderRole == .aiPartner
-        return HStack(alignment: .top, spacing: 0) {
-            if !isPartner { Spacer(minLength: 64) }
-            VStack(alignment: .center, spacing: 26) {
-                Button {
-                    viewModel.selectMessage(message.id)
-                } label: {
-                    Text(text)
-                        .font(.system(size: messageSize))
-                        .multilineTextAlignment(.leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .foregroundStyle(message.modality == .spoken ? .white : .black)
-                        .padding(14)
-                        .frame(maxWidth: .infinity, minHeight: 147, alignment: .topLeading)
-                        .background(message.modality == .spoken ? XiaoLiaoTheme.green : .white)
-                        .clipShape(RoundedRectangle(cornerRadius: 20))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 20)
-                                .strokeBorder(viewModel.editingMessageID == message.id && viewModel.audio.hasDraft ? Color.gray : .black, lineWidth: 2)
-                        }
-                        .overlay(alignment: isPartner ? .bottomLeading : .bottomTrailing) {
-                            FigmaImage(artwork: .textTail)
-                                .frame(width: 17.2822, height: 23.3026)
-                                .rotationEffect(.degrees(150))
-                                .scaleEffect(x: isPartner ? -1 : 1, y: 1)
-                                .offset(x: isPartner ? -4 : 4, y: 8)
-                        }
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("\(isPartner ? strings("对话伙伴的消息") : strings("我的消息"))：\(text)")
-                .accessibilityValue(isSelected ? strings("已选择") : strings("未选择"))
-                .accessibilityHint(strings("轻点显示或隐藏消息操作"))
-                .accessibilityIdentifier("message.\(message.logicalMessageID)")
-                .overlay(alignment: isPartner ? .topTrailing : .topLeading) {
-                    if isSelected {
-                        actionRail(isAudio: false)
-                            .offset(x: isPartner ? 49 : -49)
-                    }
-                }
-
-                detailCard
-            }
-            .frame(maxWidth: 225)
-            if isPartner { Spacer(minLength: 64) }
-        }
-        .padding(.leading, isPartner ? 53 : 24)
-        .padding(.trailing, isPartner ? 24 : 65)
-    }
-
-    private func actionRail(isAudio: Bool) -> some View {
-        VStack(spacing: isAudio ? -2 : 7) {
-            ForEach(Array(viewModel.actions(for: message).enumerated()), id: \.element.id) { index, action in
-                ArtworkButton(
-                    label: action == .play && viewModel.audio.playbackID == message.id && viewModel.audio.isPlaying
-                        ? strings("暂停播放") : action.label,
-                    glyph: action.glyph(isAudio: isAudio),
-                    ring: action.ring(isAudio: isAudio),
-                    size: action == .translate && !isAudio ? 43.8146 : 40.6344,
-                    isActive: (action == .translate && viewModel.details[message.id] == .translation)
-                        || (action == .transcribe && viewModel.details[message.id] == .transcript)
-                        || (action == .edit && viewModel.editingMessageID == message.id)
-                        || (action == .play && viewModel.audio.playbackID == message.id && viewModel.audio.isPlaying),
-                    isAvailable: viewModel.isAvailable(action, for: message),
-                    unavailableHint: action == .translate ? strings("此消息没有本地示例翻译") : strings("此消息没有可播放的录音或可朗读的伙伴回复，或该操作暂不可用")
-                ) {
-                    viewModel.perform(action, on: message.id)
-                }
+                .disabled(!viewModel.isAvailable(action, for: message))
+                .opacity(viewModel.isAvailable(action, for: message) ? 1 : 0.45)
+                .accessibilityLabel(isPlaying && action == .play ? strings("暂停播放") : strings(action.label))
+                .accessibilityValue(isActive(action) ? strings("已选择") : strings("未选择"))
+                .accessibilityHint(viewModel.isAvailable(action, for: message) ? "" : strings("此消息没有可播放的录音或可朗读的伙伴回复，或该操作暂不可用"))
                 .accessibilityIdentifier("action.\(message.id).\(action.rawValue)")
-                .offset(x: isAudio ? [0.0, 20.0, 8.0][index] : 0)
             }
         }
-        .frame(width: 44)
+        .frame(width: 64)
         .accessibilityElement(children: .contain)
+    }
+
+    private func actionGlyph(_ action: MessageAction) -> some View {
+        let glyph: FigmaArtwork = switch action {
+        case .transcribe: .transcribeGlyph
+        case .translate: .translateGlyph
+        case .edit: .editGlyph
+        case .play: isPlaying ? .pauseGlyph : .repeatGlyph
+        case .repeatAudio: .repeatGlyph
+        }
+        return Image(glyph.rawValue).renderingMode(.template).resizable().scaledToFit()
+    }
+
+    private func actionTitle(_ action: MessageAction) -> String {
+        switch action {
+        case .transcribe: strings("英文")
+        case .translate: strings("中文")
+        case .play: isPlaying ? strings("暂停播放") : strings("重播")
+        case .edit, .repeatAudio: strings(action.label)
+        }
+    }
+
+    private func isActive(_ action: MessageAction) -> Bool {
+        (action == .transcribe && viewModel.details[message.id] == .transcript)
+            || (action == .translate && viewModel.details[message.id] == .translation)
+            || (action == .edit && viewModel.editingMessageID == message.id)
+            || (action == .play && isPlaying)
     }
 
     @ViewBuilder
     private var detailCard: some View {
-        if viewModel.details[message.id] == .playback, let clip = viewModel.audioClip(for: message) {
-            playbackCard(clip)
-        } else if let text = viewModel.detailText(for: message) {
-            let isTranscript = viewModel.details[message.id] == .transcript
-            VStack(alignment: .leading, spacing: 10) {
-                Text(text)
-                    .font(.callout)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                if isTranscript {
-                    FigmaImage(artwork: .transcriptLine)
-                        .frame(height: 2)
-                        .overlay {
-                            HStack(spacing: 0) {
-                                ForEach(0..<5) { index in
-                                    FigmaImage(artwork: .transcriptDot)
-                                        .frame(width: 17, height: 15)
-                                    if index < 4 { Spacer(minLength: 0) }
-                                }
-                            }
-                        }
-                        .padding(.vertical, 7)
-                }
+        if viewModel.details[message.id] == .translation, let text = viewModel.detailText(for: message) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(strings("中文翻译")).font(.caption).foregroundStyle(XiaoLiaoTheme.green)
+                Text(text).font(.body).foregroundStyle(XiaoLiaoTheme.ink)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .foregroundStyle(isTranscript ? .white : XiaoLiaoTheme.ink)
-            .padding(10)
-            .frame(maxWidth: 201, minHeight: isTranscript ? 89 : 52, alignment: .topLeading)
-            .background(isTranscript ? XiaoLiaoTheme.green : .white)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-            .overlay {
-                RoundedRectangle(cornerRadius: 10).strokeBorder(.black, lineWidth: 2)
-            }
+            .padding(16).frame(maxWidth: .infinity, alignment: .leading)
+            .xiaoLiaoCard()
             .accessibilityIdentifier("detail.\(message.id)")
         }
     }
-
-    private func playbackCard(_ clip: LocalAudioClip) -> some View {
-        let progress = viewModel.audio.playbackID == message.id ? viewModel.audio.playbackProgress : 0
-        return VStack(alignment: .leading, spacing: 10) {
-            Text(strings("语音消息 · \(strings(clip.durationLabel))"))
-                .font(.callout)
-            FigmaImage(artwork: .transcriptLine)
-                .frame(maxWidth: 182)
-                .frame(height: 2)
-                .overlay {
-                    HStack(spacing: 0) {
-                        ForEach(0..<7) { index in
-                            FigmaImage(artwork: .transcriptDot)
-                                .frame(width: 17, height: 15)
-                                .opacity(Double(index) / 6 <= progress ? 1 : 0.45)
-                            if index < 6 { Spacer(minLength: 0) }
-                        }
-                    }
-                }
-                .padding(.vertical, 7)
-        }
-        .foregroundStyle(.white)
-        .padding(10)
-        .frame(maxWidth: 201, minHeight: 89, alignment: .topLeading)
-        .background(XiaoLiaoTheme.green)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-        .overlay { RoundedRectangle(cornerRadius: 10).strokeBorder(.black, lineWidth: 2) }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(strings("语音消息，\(strings(clip.durationLabel))"))
-        .accessibilityValue(strings("播放进度\(Int(progress * 100))%"))
-        .accessibilityIdentifier("playback.\(message.id)")
-    }
 }
 
-private extension MessageAction {
-    func glyph(isAudio: Bool) -> FigmaArtwork {
-        switch self {
-        case .transcribe: .transcribeGlyph
-        case .translate: isAudio ? .audioTranslateGlyph : .translateGlyph
-        case .repeatAudio: .repeatGlyph
-        case .play: .playGlyph
-        case .edit: .editGlyph
-        }
-    }
+/// Static word-position marks only. No elapsed-time guess is presented as
+/// speech alignment or pronunciation scoring; real word timing is a later step.
+private struct MessageRhythmDots: View {
+    let text: String
+    private var wordCount: Int { text.split(whereSeparator: { $0.isWhitespace }).count }
 
-    func ring(isAudio: Bool) -> FigmaArtwork {
-        switch self {
-        case .transcribe, .repeatAudio: .audioActionRing
-        case .translate: isAudio ? .audioActionRing : .translateRing
-        case .play: .actionRing
-        case .edit: .editRing
+    var body: some View {
+        ScrollView(.horizontal) {
+            LazyHStack(spacing: 12) {
+                ForEach(0..<wordCount, id: \.self) { _ in
+                    Image(FigmaArtwork.transcriptDot.rawValue)
+                        .renderingMode(.template).resizable().scaledToFit()
+                        .frame(width: 16, height: 16 * 15 / 17)
+                }
+            }
+            .background { Rectangle().frame(height: 1).opacity(0.35) }
         }
+        .scrollIndicators(.hidden)
+        .frame(height: 32)
+        .accessibilityHidden(true)
     }
 }

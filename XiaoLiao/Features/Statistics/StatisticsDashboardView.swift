@@ -5,13 +5,18 @@ struct StatisticsDashboardView: View {
     @Environment(\.appStrings) private var strings
     let conversation: ConversationViewModel
     let onMenu: () -> Void
+    let conversationID: String?
+    let onReturnToConversation: (() -> Void)?
     @State private var dashboard: StatisticsDashboardModel
     @Environment(\.scenePhase) private var scenePhase
-    @ScaledMetric(relativeTo: .largeTitle) private var titleSize: CGFloat = 34
+    @ScaledMetric(relativeTo: .largeTitle) private var titleSize: CGFloat = 24
     @ScaledMetric(relativeTo: .body) private var chartHeight: CGFloat = 235
 
-    init(conversation: ConversationViewModel, onMenu: @escaping () -> Void) {
+    init(conversation: ConversationViewModel, conversationID: String? = nil,
+         onReturnToConversation: (() -> Void)? = nil, onMenu: @escaping () -> Void) {
         self.conversation = conversation
+        self.conversationID = conversationID
+        self.onReturnToConversation = onReturnToConversation
         self.onMenu = onMenu
         _dashboard = State(initialValue: StatisticsDashboardModel())
     }
@@ -21,12 +26,21 @@ struct StatisticsDashboardView: View {
             HStack(spacing: 16) {
                 NavigationMenuButton(action: onMenu)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(strings("学习统计"))
-                        .font(.system(size: titleSize, weight: .bold))
+                    Text(strings(conversationID == nil ? "学习统计" : "本次对话统计"))
+                        .font(.system(size: titleSize, weight: .semibold))
                         .accessibilityAddTraits(.isHeader)
-                    Text(strings("全部对话 · 累计学习记录")).font(.subheadline)
+                    Text(conversationID == nil ? strings("全部对话 · 累计学习记录") :
+                         (conversation.history.first { $0.id == conversationID }?.title ?? strings("本次对话")))
+                        .font(.subheadline)
+                        .lineLimit(2)
                 }
                 Spacer(minLength: 0)
+                if let onReturnToConversation {
+                    Button(strings("返回对话"), action: onReturnToConversation)
+                        .font(.subheadline)
+                        .frame(minWidth: 44, minHeight: 44)
+                        .accessibilityIdentifier("stats.returnToConversation")
+                }
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 8)
@@ -40,8 +54,8 @@ struct StatisticsDashboardView: View {
                             .frame(maxWidth: .infinity, minHeight: 200)
                             .accessibilityIdentifier("stats.loading")
                     case .failed:
-                        StatisticsCard(title: strings("暂时无法读取统计")) {
-                            Text(strings("已有学习记录仍被保留，请稍后重试。"))
+                        StatisticsCard(title: strings.error("暂时无法读取统计")) {
+                            Text(strings.error("已有学习记录仍被保留，请稍后重试。"))
                             Button(strings("重试")) {
                                 Task {
                                     conversation.retryLoadingHistory()
@@ -67,26 +81,34 @@ struct StatisticsDashboardView: View {
         .background { PaperBackground() }
         .foregroundStyle(XiaoLiaoTheme.ink)
         .toolbar(.hidden, for: .navigationBar)
-        .accessibilityIdentifier("stats.screen")
+        .accessibilityIdentifier(conversationID == nil ? "stats.screen" : "stats.conversation.screen")
         .task { await load() }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await load() } }
+        }
+        .onChange(of: conversation.textStatisticsRevision) { _, _ in
+            Task { await load() }
         }
         .onChange(of: conversation.grammarStatisticsRevision) { _, _ in
             Task { await load() }
         }
     }
 
+    private var pendingGrammarCount: Int { conversation.pendingGrammarCount(conversationID: conversationID) }
+    private var failedGrammarCount: Int { conversation.failedGrammarCount(conversationID: conversationID) }
+    private var queueIssue: String? { conversation.grammarQueueIssue(conversationID: conversationID) }
+    private var grammarFailure: String? { conversation.grammarFailureMessage(conversationID: conversationID) }
+
     private func load() async {
         await dashboard.load {
-            try await conversation.statisticsSnapshot()
+            try await conversation.statisticsSnapshot(conversationID: conversationID)
         }
     }
 
     @ViewBuilder
     private func dashboardContent(_ snapshot: StatisticsSnapshot) -> some View {
         if snapshot.overall.textAnalyzedAttempts == 0 && snapshot.overall.grammarEvaluatedAttempts == 0 {
-            Text(strings("暂时还没有学习分析数据。这里会展示全部对话的学习记录。"))
+            Text(strings(conversationID == nil ? "暂时还没有学习分析数据。这里会展示全部对话的学习记录。" : "暂时还没有本次对话的分析数据。发送练习消息后，已有结果会显示在这里。"))
                 .font(.callout)
                 .padding(16)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -100,20 +122,20 @@ struct StatisticsDashboardView: View {
                 .font(.caption)
             Text(strings("AI 语法分析 · 根据本条消息的上下文判断"))
                 .font(.caption)
-            if conversation.pendingGrammarCount > 0 || conversation.failedGrammarCount > 0 {
-                Text(strings("待分析 \(conversation.pendingGrammarCount) 条 · 未完成 \(conversation.failedGrammarCount) 条"))
+            if pendingGrammarCount > 0 || failedGrammarCount > 0 {
+                Text(strings("待分析 \(pendingGrammarCount) 条 · 未完成 \(failedGrammarCount) 条"))
                     .font(.caption)
                     .accessibilityIdentifier("stats.grammar.queue")
             }
-            if let issue = conversation.grammarQueueIssue {
+            if let issue = queueIssue {
                 Text(strings.error(issue)).font(.callout)
-            } else if let failure = conversation.grammarFailureMessage {
+            } else if let failure = grammarFailure {
                 Text(strings.error(failure)).font(.callout)
             }
-            if conversation.failedGrammarCount > 0 || conversation.grammarQueueIssue != nil {
-                Text(strings("分析失败不会影响聊天，也不会计为语法错误。"))
+            if failedGrammarCount > 0 || queueIssue != nil {
+                Text(strings.error("分析失败不会影响聊天，也不会计为语法错误。"))
                     .font(.caption)
-                Button(strings("重试语法分析")) { conversation.retryFailedGrammarEvaluations() }
+                Button(strings("重试语法分析")) { conversation.retryFailedGrammarEvaluations(conversationID: conversationID) }
                     .buttonStyle(.bordered)
                     .tint(XiaoLiaoTheme.ink)
                     .frame(minHeight: 44)
@@ -195,7 +217,7 @@ struct StatisticsDashboardView: View {
                 Text(strings("数值"))
             }
             .font(.subheadline.bold())
-            Divider().overlay(XiaoLiaoTheme.ink.opacity(0.3)).gridCellColumns(2)
+            Divider().overlay(XiaoLiaoTheme.border).gridCellColumns(2)
             activityRow(strings("句子数"), value: statistics.sentenceCount.map { $0.formatted() } ?? "—", id: "sentences")
             activityRow(strings("分句数"), value: statistics.clauseCount.map { $0.formatted() } ?? "—", id: "clauses")
             activityRow(strings("平均每句分句数"), value: statistics.clausesPerSentence.map {
@@ -258,7 +280,7 @@ private struct GrammarProficiencyChart: View {
                                         in: RoundedRectangle(cornerRadius: 10))
                             .overlay {
                                 RoundedRectangle(cornerRadius: 10)
-                                    .strokeBorder(selection == metric.category ? XiaoLiaoTheme.ink : .clear, lineWidth: 1)
+                                    .strokeBorder(selection == metric.category ? XiaoLiaoTheme.green : .clear, lineWidth: 1)
                             }
                         }
                         .buttonStyle(.plain)
@@ -370,8 +392,7 @@ private struct StatisticsCard<Content: View>: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .background(XiaoLiaoTheme.paper.opacity(0.9), in: RoundedRectangle(cornerRadius: 20))
-        .overlay { RoundedRectangle(cornerRadius: 20).strokeBorder(XiaoLiaoTheme.ink.opacity(0.7), lineWidth: 1.5) }
+        .xiaoLiaoCard()
     }
 }
 

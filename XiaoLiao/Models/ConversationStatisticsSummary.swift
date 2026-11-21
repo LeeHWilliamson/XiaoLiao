@@ -69,10 +69,11 @@ nonisolated struct StatisticsSnapshot: Codable, Equatable, Sendable {
     let calendarIdentifier: String
     /// Optional half-open reporting interval [start, end).
     let interval: DateInterval?
+    /// Aggregate of the requested scope: all history, or one explicit conversation.
     let overall: PracticeStatistics
     let conversations: [ConversationStatisticsSummary]
     /// Dates follow message submission time, never analysis/summary refresh time.
     let days: [DailyStatisticsSummary]
-    /// All supplied history, even when the displayed statistics use a date range.
+    /// All supplied history, even when the displayed statistics use a date range or conversation scope.
     let vocabularyHistory: [VocabularyHistoryEntry]
 }
